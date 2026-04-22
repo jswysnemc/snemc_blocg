@@ -99,12 +99,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="page-stack">
+  <section class="page-stack editor-page">
     <header class="page-header">
       <div>
         <h1>{{ isEdit ? "编辑文章" : "创建文章" }}</h1>
         <div class="page-sub">
-          支持 Markdown、公式、Mermaid 图表与图片上传
+          结构化所见所得编辑，保留 Markdown 导出与博客页接近的正文样式
         </div>
       </div>
       <a-space :size="8">
@@ -116,155 +116,149 @@ onMounted(async () => {
       </a-space>
     </header>
 
-    <div class="editor-layout">
-      <a-card :bordered="true">
-        <a-spin :loading="loading" style="display: block">
-          <a-form :model="form" layout="vertical" :auto-label-width="true">
-            <a-row :gutter="12">
-              <a-col :span="16">
-                <a-form-item field="title" label="标题">
-                  <a-input
-                    v-model="form.title"
-                    placeholder="例如:构建高性能技术博客的渲染链路"
-                    allow-clear
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="访问 ID">
-                  <a-input
-                    :model-value="form.slug || '保存后自动生成'"
-                    readonly
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="24">
-                <a-form-item field="summary" label="摘要">
-                  <a-textarea
-                    v-model="form.summary"
-                    :auto-size="{ minRows: 2, maxRows: 4 }"
-                    placeholder="文章摘要会用于首页卡片、搜索结果和分享海报"
-                    allow-clear
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item field="category_name" label="分类">
-                  <a-select
-                    v-model="form.category_name"
-                    placeholder="选择或输入分类"
-                    allow-create
-                    allow-search
+    <a-spin :loading="loading" style="display: block">
+      <div class="editor-shell">
+        <section class="editor-main">
+          <div class="editor-stage">
+            <div class="editor-stage-hero">
+              <span class="editor-stage-kicker">Single Surface Editor</span>
+              <a-input
+                v-model="form.title"
+                class="editor-title-input"
+                size="large"
+                placeholder="例如：构建高性能技术博客的渲染链路"
+                allow-clear
+              />
+              <a-textarea
+                v-model="form.summary"
+                class="editor-summary-input"
+                :auto-size="{ minRows: 2, maxRows: 4 }"
+                placeholder="文章摘要会用于首页卡片、搜索结果和分享海报"
+              />
+              <div class="editor-stage-meta">
+                <span>访问 ID：{{ form.slug || "保存后自动生成" }}</span>
+                <span>当前分类：{{ form.category_name || "未设置" }}</span>
+                <span>标签数：{{ form.tags.length }}</span>
+              </div>
+            </div>
+
+            <MarkdownEditor v-model="form.markdown" :token="auth.token" />
+          </div>
+        </section>
+
+        <aside class="editor-sidebar">
+          <a-card :bordered="true">
+            <template #title>
+              <span style="font-weight: 600">文章属性</span>
+            </template>
+
+            <a-form :model="form" layout="vertical">
+              <a-form-item field="category_name" label="分类">
+                <a-select
+                  v-model="form.category_name"
+                  placeholder="选择或输入分类"
+                  allow-create
+                  allow-search
+                >
+                  <a-option
+                    v-for="category in taxonomies.categories"
+                    :key="category.id"
+                    :value="category.name"
                   >
-                    <a-option
-                      v-for="category in taxonomies.categories"
-                      :key="category.id"
-                      :value="category.name"
-                    >
-                      {{ category.name }}
-                    </a-option>
-                  </a-select>
-                </a-form-item>
-              </a-col>
-              <a-col :span="10">
-                <a-form-item field="tags" label="标签">
-                  <a-input-tag
-                    v-model="form.tags"
-                    placeholder="回车添加,支持多个"
-                    allow-clear
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="6">
-                <a-form-item field="status" label="状态">
-                  <a-select v-model="form.status">
-                    <a-option value="draft">草稿</a-option>
-                    <a-option value="published">发布</a-option>
-                  </a-select>
-                </a-form-item>
-              </a-col>
-              <a-col :span="24">
-                <a-form-item field="cover_image" label="封面图">
-                  <a-input
-                    v-model="form.cover_image"
-                    placeholder="/media/ab/cd/example.webp"
-                    allow-clear
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="24">
-                <a-form-item label="正文" :show-colon="false">
-                  <MarkdownEditor v-model="form.markdown" :token="auth.token" />
-                </a-form-item>
-              </a-col>
-            </a-row>
-          </a-form>
-        </a-spin>
-      </a-card>
+                    {{ category.name }}
+                  </a-option>
+                </a-select>
+              </a-form-item>
 
-      <aside class="editor-aside">
-        <a-card :bordered="true" size="small">
-          <template #title>
-            <span style="font-weight: 600">编辑器能力</span>
-          </template>
-          <ul
-            style="
-              margin: 0;
-              padding-left: 18px;
-              font-size: 13px;
-              color: var(--color-text-2);
-              line-height: 1.8;
-            "
-          >
-            <li>即时渲染 Markdown、公式与 Mermaid</li>
-            <li>拖拽、粘贴截图或远程图片地址自动接入内置图床</li>
-            <li>保存时后端生成安全 HTML 与搜索索引</li>
-          </ul>
-        </a-card>
+              <a-form-item field="tags" label="标签">
+                <a-input-tag
+                  v-model="form.tags"
+                  placeholder="回车添加，支持多个"
+                  allow-clear
+                />
+              </a-form-item>
 
-        <a-card :bordered="true" size="small">
-          <template #title>
-            <span style="font-weight: 600">标签池</span>
-          </template>
-          <a-space wrap :size="6">
-            <a-tag
-              v-for="tag in taxonomies.tags"
-              :key="tag.id"
-              checkable
-              :checked="form.tags.includes(tag.name)"
-              @check="addTagFromPool(tag.name)"
+              <a-form-item field="status" label="状态">
+                <a-select v-model="form.status">
+                  <a-option value="draft">草稿</a-option>
+                  <a-option value="published">发布</a-option>
+                </a-select>
+              </a-form-item>
+
+              <a-form-item field="cover_image" label="封面图">
+                <a-input
+                  v-model="form.cover_image"
+                  placeholder="/media/ab/cd/example.webp"
+                  allow-clear
+                />
+              </a-form-item>
+            </a-form>
+          </a-card>
+
+          <a-card :bordered="true" size="small">
+            <template #title>
+              <span style="font-weight: 600">编辑器能力</span>
+            </template>
+            <ul
+              style="
+                margin: 0;
+                padding-left: 18px;
+                font-size: 13px;
+                color: var(--color-text-2);
+                line-height: 1.8;
+              "
             >
-              {{ tag.name }}
-            </a-tag>
-          </a-space>
-          <a-empty
-            v-if="taxonomies.tags.length === 0"
-            description="暂无标签"
-            :image-size="48"
-            style="margin: 8px 0"
-          />
-        </a-card>
+              <li>结构化标题、列表、引用与表格节点</li>
+              <li>代码块单区域编辑，输入与高亮在同一表面完成</li>
+              <li>正文仍然保存为 Markdown，可直接复制或导出</li>
+              <li>图片继续走当前博客内置图床</li>
+            </ul>
+          </a-card>
 
-        <a-card :bordered="true" size="small">
-          <template #title>
-            <span style="font-weight: 600">发布清单</span>
-          </template>
-          <ul
-            style="
-              margin: 0;
-              padding-left: 18px;
-              font-size: 12px;
-              color: var(--color-text-3);
-              line-height: 1.8;
-            "
-          >
-            <li>标题与 slug 唯一且可读</li>
-            <li>摘要不超过 120 字</li>
-            <li>至少一个分类与标签</li>
-            <li>状态切至「发布」后对外可见</li>
-          </ul>
-        </a-card>
-      </aside>
-    </div>
+          <a-card :bordered="true" size="small">
+            <template #title>
+              <span style="font-weight: 600">标签池</span>
+            </template>
+            <a-space wrap :size="6">
+              <a-tag
+                v-for="tag in taxonomies.tags"
+                :key="tag.id"
+                checkable
+                :checked="form.tags.includes(tag.name)"
+                @check="addTagFromPool(tag.name)"
+              >
+                {{ tag.name }}
+              </a-tag>
+            </a-space>
+            <a-empty
+              v-if="taxonomies.tags.length === 0"
+              description="暂无标签"
+              :image-size="48"
+              style="margin: 8px 0"
+            />
+          </a-card>
+
+          <a-card :bordered="true" size="small">
+            <template #title>
+              <span style="font-weight: 600">发布清单</span>
+            </template>
+            <ul
+              style="
+                margin: 0;
+                padding-left: 18px;
+                font-size: 12px;
+                color: var(--color-text-3);
+                line-height: 1.8;
+              "
+            >
+              <li>标题与 slug 唯一且可读</li>
+              <li>摘要不超过 120 字</li>
+              <li>至少一个分类与标签</li>
+              <li>状态切至「发布」后对外可见</li>
+            </ul>
+          </a-card>
+        </aside>
+      </div>
+    </a-spin>
   </section>
 </template>

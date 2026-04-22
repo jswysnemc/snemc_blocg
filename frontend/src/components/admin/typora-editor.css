@@ -1,0 +1,571 @@
+.typora-editor {
+  --editor-bg: #f7f9fc;
+  --editor-paper: #ffffff;
+  --editor-paper-strong: #fbfcff;
+  --editor-line: #e5e6eb;
+  --editor-line-strong: #d0d8e7;
+  --editor-text: #1d2129;
+  --editor-text-soft: #4e5969;
+  --editor-muted: #86909c;
+  --editor-primary: #165dff;
+  --editor-primary-soft: rgba(22, 93, 255, 0.08);
+  --editor-shadow: 0 22px 44px rgba(15, 23, 42, 0.08);
+  --editor-shadow-soft: 0 8px 22px rgba(15, 23, 42, 0.06);
+  display: grid;
+  gap: 14px;
+}
+
+.typora-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.typora-tool,
+.typora-editor .table-toolbar button {
+  min-height: 36px;
+  border: 1px solid var(--editor-line);
+  border-radius: 999px;
+  padding: 0 13px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--editor-text-soft);
+  font-size: 12px;
+  line-height: 1;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.typora-tool:hover,
+.typora-tool:focus-visible,
+.typora-editor .table-toolbar button:hover,
+.typora-editor .table-toolbar button:focus-visible {
+  outline: none;
+  transform: translateY(-1px);
+  border-color: rgba(22, 93, 255, 0.24);
+  background: #fff;
+  color: var(--editor-text);
+}
+
+.typora-tool[data-active="true"] {
+  border-color: rgba(22, 93, 255, 0.2);
+  background: var(--editor-primary-soft);
+  color: var(--editor-primary);
+}
+
+.typora-tool.secondary {
+  background: rgba(246, 248, 252, 0.9);
+}
+
+.typora-toolbar-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--editor-line);
+}
+
+.typora-editor-card {
+  border: 1px solid var(--editor-line);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(247, 249, 252, 0.98) 100%);
+  box-shadow: var(--editor-shadow);
+  overflow: hidden;
+}
+
+.typora-editor-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--editor-line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 249, 252, 0.92));
+}
+
+.typora-meta-readout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  color: var(--editor-muted);
+  font-size: 12px;
+}
+
+.typora-editor .table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.typora-editor .editor-host {
+  min-height: 72vh;
+  background:
+    radial-gradient(circle at top right, rgba(22, 93, 255, 0.04), transparent 28%),
+    linear-gradient(180deg, var(--editor-paper-strong) 0%, var(--editor-paper) 100%);
+}
+
+.typora-editor .ProseMirror {
+  min-height: 72vh;
+  padding: 34px clamp(22px, 4vw, 72px) 120px;
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--editor-text);
+  outline: none;
+}
+
+.typora-editor .ProseMirror > * + * {
+  margin-top: 1em;
+}
+
+.typora-editor .ProseMirror h1,
+.typora-editor .ProseMirror h2,
+.typora-editor .ProseMirror h3,
+.typora-editor .ProseMirror h4 {
+  margin-top: 1.8em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--editor-text);
+}
+
+.typora-editor .ProseMirror h1 {
+  font-size: 2rem;
+}
+
+.typora-editor .ProseMirror h2 {
+  font-size: 1.4rem;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--editor-line);
+}
+
+.typora-editor .ProseMirror h3 {
+  font-size: 1.2rem;
+}
+
+.typora-editor .ProseMirror h4 {
+  font-size: 1.05rem;
+}
+
+.typora-editor .ProseMirror p,
+.typora-editor .ProseMirror li {
+  color: var(--editor-text);
+}
+
+.typora-editor .ProseMirror p {
+  max-width: 72ch;
+}
+
+.typora-editor .ProseMirror ul,
+.typora-editor .ProseMirror ol {
+  padding-left: 1.5em;
+}
+
+.typora-editor .ProseMirror li + li {
+  margin-top: 8px;
+}
+
+.typora-editor .ProseMirror a {
+  color: var(--editor-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.typora-editor .ProseMirror strong {
+  font-weight: 600;
+}
+
+.typora-editor .ProseMirror code {
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.typora-editor .ProseMirror p code,
+.typora-editor .ProseMirror li code {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--editor-primary-soft);
+  color: var(--editor-primary);
+  font-size: 0.9em;
+}
+
+.typora-editor .ProseMirror blockquote {
+  max-width: 70ch;
+  margin: 1em 0;
+  padding: 4px 14px;
+  border-left: 3px solid var(--editor-primary);
+  background: rgba(22, 93, 255, 0.04);
+  color: var(--editor-text-soft);
+  border-radius: 0 8px 8px 0;
+}
+
+.typora-editor .ProseMirror img {
+  display: block;
+  max-width: min(100%, 860px);
+  border-radius: 8px;
+  border: 1px solid var(--editor-line);
+  box-shadow: var(--editor-shadow-soft);
+}
+
+.typora-editor .pm-table-shell {
+  position: relative;
+  margin: 24px 0 30px;
+}
+
+.typora-editor .tableWrapper {
+  margin: 0;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.typora-editor .table-corner-trigger {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  z-index: 4;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--editor-line-strong);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.98);
+  color: var(--editor-text-soft);
+  box-shadow: var(--editor-shadow-soft);
+}
+
+.typora-editor .table-corner-trigger svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+}
+
+.typora-editor .table-corner-trigger[aria-expanded="true"] {
+  border-color: rgba(22, 93, 255, 0.24);
+  background: #f3f7ff;
+  color: var(--editor-primary);
+}
+
+.typora-editor .table-corner-panel {
+  position: absolute;
+  top: 24px;
+  left: 6px;
+  z-index: 5;
+  min-width: 156px;
+  padding: 10px;
+  border: 1px solid var(--editor-line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: var(--editor-shadow);
+  display: grid;
+  gap: 10px;
+}
+
+.typora-editor .table-corner-panel[hidden] {
+  display: none;
+}
+
+.typora-editor .table-corner-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--picker-columns), 12px);
+  gap: 3px;
+  justify-content: start;
+}
+
+.typora-editor .table-corner-cell {
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--editor-line-strong);
+  padding: 0;
+  background: #fff;
+}
+
+.typora-editor .table-corner-cell[data-active="true"] {
+  border-color: rgba(22, 93, 255, 0.3);
+  background: linear-gradient(180deg, rgba(64, 128, 255, 0.96), rgba(22, 93, 255, 0.96));
+}
+
+.typora-editor .table-corner-footer {
+  padding-top: 10px;
+  border-top: 1px solid var(--editor-line);
+  display: flex;
+  justify-content: center;
+}
+
+.typora-editor .table-corner-dimension {
+  min-width: 56px;
+  min-height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--editor-line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: var(--editor-text-soft);
+  font-size: 0.9rem;
+}
+
+.typora-editor .ProseMirror table {
+  width: min(100%, 920px);
+  border-collapse: collapse;
+  border: 1px solid var(--editor-line);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.typora-editor .ProseMirror th,
+.typora-editor .ProseMirror td {
+  position: relative;
+  min-width: 124px;
+  padding: 10px 12px;
+  border-right: 1px solid var(--editor-line);
+  border-bottom: 1px solid var(--editor-line);
+  vertical-align: top;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.typora-editor .ProseMirror th {
+  background: rgba(22, 93, 255, 0.06);
+  font-weight: 600;
+}
+
+.typora-editor .ProseMirror tr:last-child td {
+  border-bottom: 0;
+}
+
+.typora-editor .ProseMirror tr > :last-child {
+  border-right: 0;
+}
+
+.typora-editor .ProseMirror th p,
+.typora-editor .ProseMirror td p {
+  max-width: none;
+  margin: 0;
+}
+
+.typora-editor .ProseMirror .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(22, 93, 255, 0.08);
+  pointer-events: none;
+}
+
+.typora-editor .ProseMirror .column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: 0;
+  width: 4px;
+  background: rgba(22, 93, 255, 0.35);
+  pointer-events: none;
+}
+
+.typora-editor .pm-code-block {
+  margin: 20px 0 24px;
+  border: 1px solid #dbe3f0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fcfdff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.typora-editor .pm-code-block.ProseMirror-selectednode {
+  outline: 2px solid rgba(22, 93, 255, 0.18);
+}
+
+.typora-editor .code-block-header {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 180px) 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid #dbe3f0;
+  background: linear-gradient(180deg, #f6f9ff 0%, #eef4ff 100%);
+}
+
+.typora-editor .code-fence-label,
+.typora-editor .code-header-hint {
+  color: #667085;
+  font-size: 0.82rem;
+}
+
+.typora-editor .code-language-input {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid #dbe3f0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--editor-text);
+  padding: 0 12px;
+}
+
+.typora-editor .code-language-input:focus {
+  outline: 1px solid rgba(22, 93, 255, 0.28);
+}
+
+.typora-editor .code-surface {
+  position: relative;
+}
+
+.typora-editor .code-surface::after {
+  content: "在这里直接输入代码";
+  position: absolute;
+  left: 18px;
+  top: 16px;
+  color: #98a2b3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.typora-editor .code-surface[data-empty="true"]::after {
+  opacity: 1;
+}
+
+.typora-editor .code-highlight,
+.typora-editor .code-editor {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  padding: 18px;
+  line-height: 1.7;
+  font-size: 0.95rem;
+  white-space: pre;
+  overflow: auto;
+  tab-size: 2;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.typora-editor .code-highlight {
+  color: #1f2937;
+  pointer-events: none;
+}
+
+.typora-editor .code-highlight code {
+  display: block;
+  min-height: 100%;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.typora-editor .code-editor {
+  border: 0;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: #1f2937;
+  -webkit-text-fill-color: transparent;
+  outline: none;
+}
+
+.typora-editor .code-editor::selection {
+  background: transparent;
+}
+
+.typora-editor .code-selection {
+  border-radius: 4px;
+  background: rgba(22, 93, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(22, 93, 255, 0.08) inset;
+}
+
+.typora-editor .token.comment,
+.typora-editor .token.prolog,
+.typora-editor .token.doctype,
+.typora-editor .token.cdata {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.typora-editor .token.punctuation {
+  color: #475467;
+}
+
+.typora-editor .token.property,
+.typora-editor .token.tag,
+.typora-editor .token.constant,
+.typora-editor .token.symbol,
+.typora-editor .token.deleted {
+  color: #cf222e;
+}
+
+.typora-editor .token.boolean,
+.typora-editor .token.number {
+  color: #0550ae;
+}
+
+.typora-editor .token.selector,
+.typora-editor .token.attr-name,
+.typora-editor .token.string,
+.typora-editor .token.char,
+.typora-editor .token.builtin,
+.typora-editor .token.inserted {
+  color: #0a7ea4;
+}
+
+.typora-editor .token.operator,
+.typora-editor .token.entity,
+.typora-editor .token.url,
+.typora-editor .language-css .token.string,
+.typora-editor .style .token.string {
+  color: #8250df;
+}
+
+.typora-editor .token.atrule,
+.typora-editor .token.attr-value,
+.typora-editor .token.keyword {
+  color: #cf222e;
+}
+
+.typora-editor .token.function,
+.typora-editor .token.class-name {
+  color: #8250df;
+}
+
+.typora-editor .token.regex,
+.typora-editor .token.important,
+.typora-editor .token.variable {
+  color: #953800;
+}
+
+@media (max-width: 760px) {
+  .typora-editor .typora-toolbar,
+  .typora-editor .typora-editor-meta {
+    align-items: flex-start;
+  }
+
+  .typora-editor .typora-editor-meta {
+    flex-direction: column;
+  }
+
+  .typora-editor .table-toolbar {
+    justify-content: flex-start;
+  }
+
+  .typora-editor .editor-host,
+  .typora-editor .ProseMirror {
+    min-height: 62vh;
+  }
+
+  .typora-editor .ProseMirror {
+    padding: 24px 18px 84px;
+  }
+
+  .typora-editor .code-block-header {
+    grid-template-columns: 1fr;
+  }
+
+  .typora-editor .ProseMirror table {
+    min-width: 620px;
+  }
+}
