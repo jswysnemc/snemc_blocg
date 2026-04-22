@@ -1,0 +1,388 @@
+/* ------------------------------------------------------------------
+   admin 后台布局样式
+   组件级样式交给 Arco,这里只留 shell / 页面级留白与排版辅助类
+   ------------------------------------------------------------------ */
+
+.admin-shell {
+  min-height: 100vh;
+  display: flex;
+}
+
+.admin-sider {
+  width: 224px;
+  flex-shrink: 0;
+  background: #001529;
+  color: rgba(255, 255, 255, 0.82);
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--color-neutral-3);
+}
+
+.admin-sider .admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-sider .admin-brand-mark {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: rgb(var(--primary-6));
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.admin-sider .admin-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.admin-sider .admin-brand-text strong {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.admin-sider .admin-brand-text small {
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 12px;
+}
+
+.admin-sider .admin-menu-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.admin-sider .admin-user {
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-sider .admin-user strong {
+  display: block;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.admin-sider .admin-user small {
+  display: block;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 11px;
+}
+
+.admin-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.admin-topbar {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  background: #fff;
+  border-bottom: 1px solid var(--color-neutral-3);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.admin-topbar .topbar-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-1);
+}
+
+.admin-main {
+  flex: 1;
+  padding: 16px 20px 32px;
+  overflow-y: auto;
+}
+
+.admin-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-3);
+  font-size: 14px;
+}
+
+/* 页面级容器 */
+.page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-text-1);
+}
+
+.page-header .page-sub {
+  margin-top: 4px;
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+/* 统计卡片 */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stat-card {
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--color-neutral-3);
+  border-radius: var(--radius-card);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-card .stat-label {
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.stat-card .stat-value {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 登录页 */
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(135deg, #f5f7fa 0%, #e8eef7 100%);
+  padding: 16px;
+}
+
+.login-card {
+  width: min(400px, 100%);
+  background: #fff;
+  border: 1px solid var(--color-neutral-3);
+  border-radius: 8px;
+  padding: 32px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.login-card .login-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.login-card .login-brand-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgb(var(--primary-6));
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-card h1 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.login-card .login-sub {
+  margin: 0 0 20px;
+  color: var(--color-text-3);
+  font-size: 13px;
+}
+
+/* 编辑器布局 */
+.editor-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 288px;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.editor-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 64px;
+}
+
+.editor-surface {
+  border: 1px solid var(--color-neutral-3);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.editor-surface .vditor {
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* taxonomy 双栏 */
+.taxonomy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.taxonomy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.taxonomy-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+
+.taxonomy-item:hover {
+  background: var(--color-fill-1);
+  border-color: var(--color-neutral-3);
+}
+
+.taxonomy-item .taxonomy-name {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.taxonomy-item .taxonomy-slug {
+  color: var(--color-text-3);
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+/* 评论卡片 */
+.comment-card {
+  padding: 12px 14px;
+  border: 1px solid var(--color-neutral-3);
+  border-radius: var(--radius-card);
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comment-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.comment-card-head .comment-author {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.comment-card-head .comment-author strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.comment-card-head .comment-author small {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.comment-card-body {
+  font-size: 13px;
+  color: var(--color-text-1);
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.comment-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.comment-card-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* 响应式 */
+@media (max-width: 1180px) {
+  .stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .editor-layout,
+  .taxonomy-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-aside {
+    position: static;
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-sider {
+    display: none;
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-main {
+    padding: 12px;
+  }
+}

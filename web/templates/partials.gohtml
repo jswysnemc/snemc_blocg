@@ -1,0 +1,74 @@
+{{define "head"}}
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{.Title}}</title>
+  <meta name="description" content="{{.Description}}" />
+  <link rel="canonical" href="{{.Canonical}}" />
+  <link rel="stylesheet" href="/assets/site.css" />
+  {{if .PublicCSSPath}}<link rel="stylesheet" href="{{.PublicCSSPath}}" />{{end}}
+</head>
+{{end}}
+
+{{define "site-header"}}
+<header class="site-header">
+  <div class="shell header-shell">
+    <a class="brand" href="/">
+      <span class="brand-mark">S</span>
+      <span class="brand-copy">
+        <strong>{{.SiteName}}</strong>
+        <small>Fast editorial engineering blog</small>
+      </span>
+    </a>
+    <nav class="top-nav">
+      <a href="/">首页</a>
+      <a href="/archive">归档</a>
+      <a href="/search">搜索</a>
+      <a href="/admin">后台</a>
+    </nav>
+    <form class="header-search" action="/search" method="get">
+      <input type="search" name="q" placeholder="搜索文章、标签、关键词" value="{{.SearchQuery}}" />
+      <button type="submit">Search</button>
+    </form>
+  </div>
+</header>
+{{end}}
+
+{{define "site-footer"}}
+<footer class="site-footer">
+  <div class="shell footer-shell">
+    <div>
+      <strong>{{.SiteName}}</strong>
+      <p>Go 预编译内容，Vue3 驱动后台和前台增强，SQLite 提供全文搜索和单机高效读写。</p>
+    </div>
+    <div class="footer-meta">
+      <span>High performance editorial system</span>
+      <span>Anonymous personalization ready</span>
+    </div>
+  </div>
+</footer>
+{{end}}
+
+{{define "post-card"}}
+<article class="post-card">
+  <div class="post-card-top">
+    {{if .CategoryName}}<a class="pill" href="/category/{{.CategorySlug}}">{{.CategoryName}}</a>{{end}}
+    <span class="stat">{{.ReadingTime}} min</span>
+  </div>
+  <h3><a href="/posts/{{.Slug}}">{{.Title}}</a></h3>
+  <p>{{if .Summary}}{{.Summary}}{{else}}{{.Excerpt}}{{end}}</p>
+  <div class="post-card-bottom">
+    <div class="tag-row">
+      {{range .Tags}}<a class="tag" href="/tag/{{.Slug}}">#{{.Name}}</a>{{end}}
+    </div>
+    <div class="meta-row">
+      <span>{{.Views}} views</span>
+      <span>{{.Likes}} likes</span>
+    </div>
+  </div>
+</article>
+{{end}}
+
+{{define "scripts"}}
+{{if .PublicJSPath}}<script type="module" src="{{.PublicJSPath}}"></script>{{end}}
+{{end}}

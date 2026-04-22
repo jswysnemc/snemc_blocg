@@ -1,0 +1,102 @@
+{{define "home"}}
+<!doctype html>
+<html lang="zh-CN">
+{{template "head" .}}
+<body>
+  <div class="page-gradient"></div>
+  {{template "site-header" .}}
+  <main class="shell home-grid">
+    <section class="hero-panel">
+      <div class="hero-kicker">Minimal Swiss Editorial System</div>
+      <h1>把渲染成本前移，把阅读速度留给用户。</h1>
+      <p>公开页由 Go 输出预编译内容，评论、点赞和个性化推荐单独增强。界面紧凑，结构清晰，适合长文阅读与后台高频编辑。</p>
+      <div class="hero-actions">
+        <a class="button primary" href="/search">开始搜索</a>
+        <a class="button ghost" href="/admin">进入后台</a>
+      </div>
+    </section>
+    <aside class="insight-panel">
+      <div class="metric-card">
+        <span>Render Strategy</span>
+        <strong>Write-Time Compilation</strong>
+      </div>
+      <div class="metric-card">
+        <span>Search Engine</span>
+        <strong>SQLite FTS5</strong>
+      </div>
+      <div class="metric-card">
+        <span>Editor</span>
+        <strong>Instant Rendering Markdown</strong>
+      </div>
+    </aside>
+
+    {{if .Featured}}
+    <section class="featured-panel">
+      <div class="section-heading">
+        <span>Featured</span>
+        <h2>{{.Featured.Title}}</h2>
+      </div>
+      <p>{{.Featured.Summary}}</p>
+      <div class="featured-meta">
+        <a class="button primary" href="/posts/{{.Featured.Slug}}">阅读文章</a>
+        <span>{{.Featured.ReadingTime}} 分钟阅读</span>
+        <span>{{.Featured.Views}} 次浏览</span>
+      </div>
+    </section>
+    {{end}}
+
+    <section class="content-panel">
+      <div class="section-heading">
+        <span>Latest Writing</span>
+        <h2>最近发布</h2>
+      </div>
+      <div class="section-actions">
+        <a class="button ghost" href="/archive">查看全部文章</a>
+      </div>
+      <div class="post-grid">
+        {{range .Posts}}{{template "post-card" .}}{{end}}
+      </div>
+    </section>
+
+    <aside class="sidebar-panel">
+      <section class="sidebar-card">
+        <div class="section-heading compact">
+          <span>Categories</span>
+          <h3>分类导航</h3>
+        </div>
+        <div class="cluster">
+          {{range .Categories}}<a class="tag" href="/category/{{.Slug}}">{{.Name}}</a>{{end}}
+        </div>
+      </section>
+      <section class="sidebar-card">
+        <div class="section-heading compact">
+          <span>Tags</span>
+          <h3>技术标签</h3>
+        </div>
+        <div class="cluster">
+          {{range .Tags}}<a class="tag" href="/tag/{{.Slug}}">{{.Name}}</a>{{end}}
+        </div>
+      </section>
+      <section class="sidebar-card">
+        <div class="section-heading compact">
+          <span>For You</span>
+          <h3>个性化推荐</h3>
+        </div>
+        <div class="recommend-list">
+          {{range .Recommendations}}
+          <a class="recommend-item" href="/posts/{{.Slug}}">
+            <strong>{{.Title}}</strong>
+            <small>{{.Reason}}</small>
+          </a>
+          {{else}}
+          <p class="muted">浏览几篇文章后，这里会根据你的阅读偏好推荐内容。</p>
+          {{end}}
+        </div>
+      </section>
+    </aside>
+  </main>
+  {{template "site-footer" .}}
+  {{template "scripts" .}}
+</body>
+</html>
+{{end}}

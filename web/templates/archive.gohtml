@@ -1,0 +1,61 @@
+{{define "archive"}}
+<!doctype html>
+<html lang="zh-CN">
+{{template "head" .}}
+<body>
+  <div class="page-gradient"></div>
+  {{template "site-header" .}}
+  <main class="shell list-shell">
+    <section class="page-hero compact-hero">
+      <div class="hero-kicker">Archive</div>
+      <h1>全部文章</h1>
+      <p>按发布时间顺序向下浏览，页面会自动继续加载，直到展示完所有已发布文章。</p>
+    </section>
+
+    <section
+      class="content-panel archive-panel"
+      data-archive-feed
+      data-page-size="{{.PageSize}}"
+      data-loaded="{{len .Posts}}"
+      data-total="{{.TotalPosts}}"
+    >
+      <div class="section-heading">
+        <span>Publishing Index</span>
+        <h2>当前共 {{.TotalPosts}} 篇文章</h2>
+      </div>
+
+      <div class="archive-feed-summary">
+        <span data-archive-progress>已显示 {{len .Posts}} / {{.TotalPosts}} 篇文章</span>
+        <a class="button ghost" href="/search">按关键词搜索</a>
+      </div>
+
+      <div class="post-grid" data-archive-grid>
+        {{range .Posts}}{{template "post-card" .}}{{else}}<p class="empty-text">还没有已发布文章。</p>{{end}}
+      </div>
+
+      <div class="archive-actions">
+        <button
+          class="button ghost"
+          type="button"
+          data-archive-load-more
+          {{if not .HasMore}}hidden{{end}}
+        >
+          加载更多
+        </button>
+        <p class="archive-complete" data-archive-complete {{if .HasMore}}hidden{{end}}>
+          已展示全部文章。
+        </p>
+      </div>
+
+      <div class="archive-sentinel" data-archive-sentinel aria-hidden="true"></div>
+
+      <noscript>
+        <p class="archive-noscript">当前页面默认展示首批文章。开启 JavaScript 后会自动继续加载后续内容。</p>
+      </noscript>
+    </section>
+  </main>
+  {{template "site-footer" .}}
+  {{template "scripts" .}}
+</body>
+</html>
+{{end}}

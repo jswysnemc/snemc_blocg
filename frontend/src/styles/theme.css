@@ -1,0 +1,92 @@
+/* ------------------------------------------------------------------
+   全局主题:企业蓝 + 中性灰
+   - Arco 默认主色 #165DFF 已经符合需求,此处只覆盖必要 token
+   - 字体栈去掉 Google Fonts,改系统字体,加载更快
+   - 紧凑密度通过 <a-config-provider size="small" /> 全局控制
+   ------------------------------------------------------------------ */
+
+:root {
+  /* Arco 语义色继承默认值,此处仅调整中性变量 */
+  --color-bg-page: #f5f7fa;
+  --color-bg-panel: #ffffff;
+  --color-border-subtle: var(--color-neutral-3);
+  --radius-card: 6px;
+  --spacing-gutter: 16px;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica,
+    Arial, sans-serif;
+  --font-mono: "SFMono-Regular", "JetBrains Mono", Consolas, Menlo,
+    "Liberation Mono", monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-width: 320px;
+  background: var(--color-bg-page);
+  color: var(--color-text-1);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  color: rgb(var(--primary-6));
+}
+
+img {
+  max-width: 100%;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+}
+
+/* Arco table/list/form 默认圆角较大,整体收紧以贴近企业后台 */
+.arco-card,
+.arco-table-container,
+.arco-input-wrapper,
+.arco-textarea-wrapper,
+.arco-select-view,
+.arco-btn {
+  border-radius: var(--radius-card) !important;
+}
+
+/* 滚动条统一 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-neutral-4);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-neutral-5);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

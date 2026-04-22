@@ -1,0 +1,13 @@
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
+
+.mermaid {
+  margin: 20px 0;
+  padding: 16px;
+  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid #e5e6eb;
+}

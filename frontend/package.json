@@ -1,0 +1,28 @@
+{
+  "name": "snemc-blog-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@arco-design/web-vue": "^2.58.0",
+    "@arco-plugins/vite-vue": "^1.4.6",
+    "katex": "^0.16.25",
+    "lucide-vue-next": "^0.542.0",
+    "mermaid": "^11.12.0",
+    "pinia": "^3.0.3",
+    "vditor": "^3.11.2",
+    "vue": "^3.5.22",
+    "vue-router": "^4.6.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.10",
+    "vue-tsc": "^3.1.1"
+  }
+}

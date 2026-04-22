@@ -1,0 +1,78 @@
+{{define "search"}}
+<!doctype html>
+<html lang="zh-CN">
+{{template "head" .}}
+<body>
+  <div class="page-gradient"></div>
+  {{template "site-header" .}}
+  <main class="shell list-shell">
+    <section class="page-hero compact-hero">
+      <div class="hero-kicker">Search Engine</div>
+      <h1>搜索结果</h1>
+      <p>支持关键词搜索和语义搜索。关键词搜索适合英文术语与精确匹配，语义搜索适合中文自然表达。</p>
+      <form class="search-panel" action="/search" method="get" data-search-form>
+        <input type="search" name="q" value="{{.Query}}" placeholder="例如：渲染、SQLite、评论审核" />
+        <div class="search-mode-switch">
+          <label class="search-mode-option">
+            <input type="radio" name="mode" value="keyword" {{if eq .RequestedMode "keyword"}}checked{{end}} />
+            <span>关键词搜索</span>
+          </label>
+          <label class="search-mode-option">
+            <input type="radio" name="mode" value="semantic" {{if eq .RequestedMode "semantic"}}checked{{end}} />
+            <span>语义搜索</span>
+          </label>
+        </div>
+        <button class="button primary" type="submit" data-search-submit>检索</button>
+      </form>
+      <p class="search-submit-status" data-search-status hidden></p>
+      {{if .Notice}}<p class="search-notice">{{.Notice}}</p>{{end}}
+      <p class="search-count">当前模式：{{if eq .ExecutedMode "semantic"}}语义搜索{{else}}关键词搜索{{end}}</p>
+      <p class="search-count">共找到 {{.ResultCount}} 条结果</p>
+    </section>
+    <div class="content-with-sidebar">
+      <section class="content-panel">
+        <div class="search-list">
+          {{range .Results}}
+          <article class="search-item">
+            <div class="post-card-top">
+              {{if .CategoryName}}<a class="pill" href="/category/{{.CategorySlug}}">{{.CategoryName}}</a>{{end}}
+              <span class="stat">{{.ReadingTime}} min</span>
+            </div>
+            <h3><a href="/posts/{{.Slug}}">{{.Title}}</a></h3>
+            <p class="muted">{{safeHTML .Snippet}}</p>
+            <div class="tag-row">
+              {{range .Tags}}<a class="tag" href="/tag/{{.Slug}}">#{{.Name}}</a>{{end}}
+            </div>
+          </article>
+          {{else}}
+          <p class="empty-text">没有匹配结果，换一个更具体的关键词试试。</p>
+          {{end}}
+        </div>
+      </section>
+      <aside class="sidebar-panel">
+        <section class="sidebar-card">
+          <div class="section-heading compact">
+            <span>Categories</span>
+            <h3>浏览方向</h3>
+          </div>
+          <div class="cluster">
+            {{range .Categories}}<a class="tag" href="/category/{{.Slug}}">{{.Name}}</a>{{end}}
+          </div>
+        </section>
+        <section class="sidebar-card">
+          <div class="section-heading compact">
+            <span>Tags</span>
+            <h3>标签筛选</h3>
+          </div>
+          <div class="cluster">
+            {{range .Tags}}<a class="tag" href="/tag/{{.Slug}}">{{.Name}}</a>{{end}}
+          </div>
+        </section>
+      </aside>
+    </div>
+  </main>
+  {{template "site-footer" .}}
+  {{template "scripts" .}}
+</body>
+</html>
+{{end}}

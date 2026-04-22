@@ -1,0 +1,75 @@
+{{define "post"}}
+<!doctype html>
+<html lang="zh-CN">
+{{template "head" .}}
+<body>
+  <div class="page-gradient"></div>
+  {{template "site-header" .}}
+  <main class="shell post-shell">
+    <article class="article-panel">
+      <div class="article-meta">
+        {{if .Post.CategoryName}}<a class="pill" href="/category/{{.Post.CategorySlug}}">{{.Post.CategoryName}}</a>{{end}}
+        <span>{{.Post.ReadingTime}} 分钟阅读</span>
+        <span>{{.Post.Views}} 次浏览</span>
+      </div>
+      <h1>{{.Post.Title}}</h1>
+      <p class="article-summary">{{if .Post.Summary}}{{.Post.Summary}}{{else}}{{.Post.Excerpt}}{{end}}</p>
+      <div class="tag-row article-tags">
+        {{range .Post.Tags}}<a class="tag" href="/tag/{{.Slug}}">#{{.Name}}</a>{{end}}
+      </div>
+      <div class="article-content prose" id="article-content">{{safeHTML .Post.RenderedHTML}}</div>
+      <section class="article-end-actions">
+        <div class="section-heading compact">
+          <span>Interaction</span>
+          <h3>读完之后</h3>
+        </div>
+        <div class="article-actions article-actions-bottom">
+          <div id="post-like-widget" data-widget="post-like" data-slug="{{.Post.Slug}}" data-likes="{{.Post.Likes}}" data-liked="{{if .Post.LikedByVisitor}}true{{else}}false{{end}}"></div>
+          <button class="button ghost" type="button" data-copy-link="{{.Canonical}}">复制链接</button>
+          <a class="button ghost" target="_blank" rel="noreferrer" href="/api/posts/{{.Post.Slug}}/share-poster.svg">分享海报</a>
+        </div>
+      </section>
+      <section class="comment-panel">
+        <div class="section-heading">
+          <span>Interaction</span>
+          <h2>评论区</h2>
+        </div>
+        <div id="comment-widget" data-widget="comments" data-post-slug="{{.Post.Slug}}"></div>
+      </section>
+    </article>
+
+    <aside class="article-sidebar">
+      <section class="sidebar-card">
+        <div class="section-heading compact">
+          <span>Contents</span>
+          <h3>目录</h3>
+        </div>
+        <nav class="toc-list" data-toc='{{.Post.TOCJSON}}'></nav>
+        <div class="toc-preview" data-toc-preview>
+          <strong>当前章节</strong>
+          <p>滚动正文时，目录会自动跟随高亮。</p>
+        </div>
+      </section>
+      <section class="sidebar-card">
+        <div class="section-heading compact">
+          <span>Recommended</span>
+          <h3>继续阅读</h3>
+        </div>
+        <div class="recommend-list">
+          {{range .Recommendations}}
+          <a class="recommend-item" href="/posts/{{.Slug}}">
+            <strong>{{.Title}}</strong>
+            <small>{{.Reason}}</small>
+          </a>
+          {{else}}
+          <p class="muted">更多相关文章会根据阅读行为逐步出现。</p>
+          {{end}}
+        </div>
+      </section>
+    </aside>
+  </main>
+  {{template "site-footer" .}}
+  {{template "scripts" .}}
+</body>
+</html>
+{{end}}

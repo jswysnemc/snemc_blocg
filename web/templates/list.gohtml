@@ -1,0 +1,47 @@
+{{define "list"}}
+<!doctype html>
+<html lang="zh-CN">
+{{template "head" .}}
+<body>
+  <div class="page-gradient"></div>
+  {{template "site-header" .}}
+  <main class="shell list-shell">
+    <section class="page-hero compact-hero">
+      <div class="hero-kicker">Curated Index</div>
+      <h1>{{.Heading}}</h1>
+      <p>{{.Subheading}}</p>
+    </section>
+    <div class="content-with-sidebar">
+      <section class="content-panel">
+        <div class="post-grid">
+          {{range .Posts}}{{template "post-card" .}}{{else}}<p class="empty-text">当前条件下还没有文章。</p>{{end}}
+        </div>
+      </section>
+      <aside class="sidebar-panel">
+        <section class="sidebar-card">
+          <div class="section-heading compact">
+            <span>Categories</span>
+            <h3>所有分类</h3>
+          </div>
+          <div class="cluster">
+            {{range .Categories}}<a class="tag" href="/category/{{.Slug}}">{{.Name}}</a>{{end}}
+          </div>
+        </section>
+        <section class="sidebar-card">
+          <div class="section-heading compact">
+            <span>Tags</span>
+            <h3>所有标签</h3>
+          </div>
+          <div class="cluster">
+            {{range .Tags}}<a class="tag" href="/tag/{{.Slug}}">{{.Name}}</a>{{end}}
+          </div>
+        </section>
+      </aside>
+    </div>
+  </main>
+  {{template "site-footer" .}}
+  {{template "scripts" .}}
+</body>
+</html>
+{{end}}
+
