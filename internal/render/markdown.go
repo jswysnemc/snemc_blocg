@@ -3,7 +3,9 @@ package render
 import (
 	"bytes"
 	"html"
+	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -42,7 +44,7 @@ func NewRenderer() *Renderer {
 	policy.AllowAttrs("class", "id").OnElements("pre", "code", "span", "div", "h1", "h2", "h3", "h4", "h5", "h6")
 	policy.AllowAttrs("data-language").OnElements("code")
 	policy.AllowAttrs("data-language").OnElements("div")
-	policy.AllowAttrs("src", "alt", "title", "loading", "decoding").OnElements("img")
+	policy.AllowAttrs("src", "alt", "title", "loading", "decoding", "width", "height").OnElements("img")
 	policy.AllowAttrs("class").OnElements("img")
 	policy.AllowAttrs("src", "title", "allow", "allowfullscreen", "loading", "referrerpolicy", "frameborder").OnElements("iframe")
 	policy.AllowURLSchemes("http", "https", "mailto")
@@ -89,6 +91,7 @@ func (r *Renderer) Render(markdown string) (Result, error) {
 	rendered := out.String()
 	rendered = wrapMermaidBlocks(rendered)
 	rendered = r.policy.Sanitize(rendered)
+	rendered = enhanceImageTags(rendered)
 
 	plain := plainText(rendered)
 	return Result{
@@ -117,6 +120,50 @@ func decodeCodeHTML(input string) string {
 	tagRe := regexp.MustCompile(`<[^>]+>`)
 	withoutTags := tagRe.ReplaceAllString(input, "")
 	return html.UnescapeString(withoutTags)
+}
+
+func enhanceImageTags(input string) string {
+	imgRe := regexp.MustCompile(`(?i)<img\b[^>]*>`)
+	srcRe := regexp.MustCompile(`\bsrc="([^"]+)"`)
+	widthRe := regexp.MustCompile(`\bwidth="[^"]*"`)
+	heightRe := regexp.MustCompile(`\bheight="[^"]*"`)
+	loadingRe := regexp.MustCompile(`\bloading="[^"]*"`)
+	decodingRe := regexp.MustCompile(`\bdecoding="[^"]*"`)
+
+	return imgRe.ReplaceAllStringFunc(input, func(tag string) string {
+		updated := tag
+		srcMatch := srcRe.FindStringSubmatch(tag)
+		if len(srcMatch) == 2 {
+			if parsed, err := url.Parse(srcMatch[1]); err == nil && strings.HasPrefix(parsed.Path, "/media/") {
+				query := parsed.Query()
+				if width := parsePositiveAttribute(query.Get("w")); width > 0 && !widthRe.MatchString(updated) {
+					updated = strings.Replace(updated, ">", ` width="`+strconv.Itoa(width)+`">`, 1)
+				}
+				if height := parsePositiveAttribute(query.Get("h")); height > 0 && !heightRe.MatchString(updated) {
+					updated = strings.Replace(updated, ">", ` height="`+strconv.Itoa(height)+`">`, 1)
+				}
+				if parsed.RawQuery != "" {
+					parsed.RawQuery = ""
+					updated = strings.Replace(updated, `src="`+srcMatch[1]+`"`, `src="`+parsed.String()+`"`, 1)
+				}
+			}
+		}
+		if !loadingRe.MatchString(updated) {
+			updated = strings.Replace(updated, ">", ` loading="lazy">`, 1)
+		}
+		if !decodingRe.MatchString(updated) {
+			updated = strings.Replace(updated, ">", ` decoding="async">`, 1)
+		}
+		return updated
+	})
+}
+
+func parsePositiveAttribute(value string) int {
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || parsed <= 0 {
+		return 0
+	}
+	return parsed
 }
 
 func renderCodeWrapper(w util.BufWriter, context highlighting.CodeBlockContext, entering bool) {

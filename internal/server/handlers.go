@@ -5,8 +5,6 @@ import (
 	"context"
 	"fmt"
 	"html/template"
-	"io"
-	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -714,26 +712,6 @@ func (a *App) handleAdminDeleteComment(w http.ResponseWriter, r *http.Request) {
 	a.respondJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-func (a *App) handleAdminImageUpload(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		a.respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid form data"})
-		return
-	}
-	file, header, err := r.FormFile("image")
-	if err != nil {
-		a.respondJSON(w, http.StatusBadRequest, map[string]string{"error": "missing image"})
-		return
-	}
-	defer file.Close()
-
-	relativePath, err := a.storeUpload(header, file)
-	if err != nil {
-		a.respondJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-		return
-	}
-	a.respondJSON(w, http.StatusOK, map[string]string{"url": "/uploads/" + relativePath})
-}
-
 func (a *App) handleAdminApp(w http.ResponseWriter, r *http.Request) {
 	path := filepath.Join(a.cfg.FrontendDistDir, "admin.html")
 	if _, err := os.Stat(path); err != nil {
@@ -777,44 +755,6 @@ func (a *App) invalidateContentCache(_ string) {
 	a.postCache.DeletePrefix("")
 	a.searchCache.DeletePrefix("")
 	a.taxonomyCache.Delete("all")
-}
-
-func (a *App) storeUpload(header *multipart.FileHeader, file multipart.File) (string, error) {
-	if header.Size > 10<<20 {
-		return "", fmt.Errorf("image too large")
-	}
-
-	ext := strings.ToLower(filepath.Ext(header.Filename))
-	switch ext {
-	case ".jpg", ".jpeg", ".png", ".webp", ".gif":
-	default:
-		return "", fmt.Errorf("unsupported image type")
-	}
-
-	sniff := make([]byte, 512)
-	n, err := file.Read(sniff)
-	if err != nil && err != io.EOF {
-		return "", err
-	}
-	contentType := http.DetectContentType(sniff[:n])
-	switch contentType {
-	case "image/jpeg", "image/png", "image/webp", "image/gif":
-	default:
-		return "", fmt.Errorf("invalid image content type")
-	}
-
-	filename := randomID() + ext
-	fullPath := filepath.Join(a.cfg.UploadsDir, filename)
-	dst, err := os.Create(fullPath)
-	if err != nil {
-		return "", err
-	}
-	defer dst.Close()
-	reader := io.MultiReader(bytes.NewReader(sniff[:n]), file)
-	if _, err := io.Copy(dst, reader); err != nil {
-		return "", err
-	}
-	return filename, nil
 }
 
 func (a *App) applyPostCacheHeaders(w http.ResponseWriter, r *http.Request, post store.PostDetail) {

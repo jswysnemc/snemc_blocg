@@ -34,24 +34,23 @@ onMounted(() => {
       actions: [],
     },
     upload: {
-      url: "/api/admin/upload/image",
+      url: "/api/admin/media/images",
+      linkToImgUrl: "/api/admin/media/import",
       fieldName: "image",
-      headers: {
-        Authorization: `Bearer ${props.token}`,
+      multiple: true,
+      accept: "image/jpeg,image/png,image/webp,image/gif",
+      setHeaders() {
+        return {
+          Authorization: `Bearer ${props.token}`,
+        };
       },
-      format(files, responseText) {
-        const response = JSON.parse(responseText) as { url: string };
-        const name = files[0]?.name ?? "image";
-        return JSON.stringify({
-          msg: "",
-          code: 0,
-          data: {
-            errFiles: [],
-            succMap: {
-              [name]: response.url,
-            },
-          },
-        });
+      validate(files) {
+        for (const file of files) {
+          if (file.size > 10 * 1024 * 1024) {
+            return `${file.name} 超过 10MB 限制`;
+          }
+        }
+        return true;
       },
     },
     value: props.modelValue,
@@ -79,4 +78,3 @@ onBeforeUnmount(() => {
 <template>
   <div ref="editorTarget" class="editor-surface"></div>
 </template>
-

@@ -33,6 +33,7 @@ type Config struct {
 	Addr                  string
 	DataDir               string
 	DatabasePath          string
+	MediaDir              string
 	UploadsDir            string
 	FrontendDistDir       string
 	PublicAssetsDir       string
@@ -76,6 +77,7 @@ type fileServerConfig struct {
 	Addr            *string `toml:"addr"`
 	DataDir         *string `toml:"data_dir"`
 	DatabasePath    *string `toml:"database_path"`
+	MediaDir        *string `toml:"media_dir"`
 	UploadsDir      *string `toml:"uploads_dir"`
 	FrontendDistDir *string `toml:"frontend_dist_dir"`
 }
@@ -141,6 +143,7 @@ func Load(root string) Config {
 		RecommendationN:    4,
 	}
 	cfg.DatabasePath = filepath.Join(cfg.DataDir, "blog.sqlite3")
+	cfg.MediaDir = filepath.Join(cfg.DataDir, "media")
 	cfg.UploadsDir = filepath.Join(cfg.DataDir, "uploads")
 
 	configPath := strings.TrimSpace(os.Getenv("BLOG_CONFIG"))
@@ -176,6 +179,11 @@ func applyFileConfig(cfg Config, path string) Config {
 		cfg.DatabasePath = *file.Server.DatabasePath
 	} else if file.Server.DataDir != nil {
 		cfg.DatabasePath = filepath.Join(cfg.DataDir, "blog.sqlite3")
+	}
+	if file.Server.MediaDir != nil {
+		cfg.MediaDir = *file.Server.MediaDir
+	} else if file.Server.DataDir != nil {
+		cfg.MediaDir = filepath.Join(cfg.DataDir, "media")
 	}
 	if file.Server.UploadsDir != nil {
 		cfg.UploadsDir = *file.Server.UploadsDir
@@ -240,6 +248,11 @@ func applyEnvOverrides(cfg Config, root string) Config {
 		cfg.DatabasePath = value
 	} else if cfg.DatabasePath == "" {
 		cfg.DatabasePath = filepath.Join(cfg.DataDir, "blog.sqlite3")
+	}
+	if value, ok := envValue("BLOG_MEDIA_DIR"); ok {
+		cfg.MediaDir = value
+	} else if cfg.MediaDir == "" {
+		cfg.MediaDir = filepath.Join(cfg.DataDir, "media")
 	}
 	if value, ok := envValue("BLOG_UPLOADS_DIR"); ok {
 		cfg.UploadsDir = value

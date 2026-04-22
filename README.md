@@ -6,7 +6,7 @@
 
 - 公开站点由 Go 输出页面，文章正文在保存时预编译为安全 HTML
 - 后台使用 Vue3，支持单管理员登录、文章编辑、评论审核、分类标签管理
-- Markdown 支持代码高亮、公式渲染、Mermaid 按需增强
+- Markdown 支持代码高亮、公式渲染、Mermaid 按需增强与内置图床
 - SQLite 启用 `WAL`，全文搜索基于 `FTS5`
 - 匿名访客使用 `visitor_id + 浏览器指纹` 做轻量个性化与风控
 - 评论先入库待审核，再异步邮件通知；预留 AI 审核接口
@@ -38,6 +38,7 @@ go run ./cmd/server
 ## Optional Environment Variables
 
 - `BLOG_ADDR`
+- `BLOG_MEDIA_DIR`
 - `BLOG_SITE_URL`
 - `BLOG_JWT_SECRET`
 - `BLOG_ADMIN_USERNAME`
@@ -65,4 +66,3 @@ go run ./cmd/server
 
 - 默认管理员账号
 - 示例分类、标签和一篇演示 Markdown 能力的文章
-

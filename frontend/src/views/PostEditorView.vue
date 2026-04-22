@@ -187,7 +187,7 @@ onMounted(async () => {
                 <a-form-item field="cover_image" label="封面图">
                   <a-input
                     v-model="form.cover_image"
-                    placeholder="/uploads/example.webp"
+                    placeholder="/media/ab/cd/example.webp"
                     allow-clear
                   />
                 </a-form-item>
@@ -217,7 +217,7 @@ onMounted(async () => {
             "
           >
             <li>即时渲染 Markdown、公式与 Mermaid</li>
-            <li>粘贴或拖拽上传图片至本地存储</li>
+            <li>拖拽、粘贴截图或远程图片地址自动接入内置图床</li>
             <li>保存时后端生成安全 HTML 与搜索索引</li>
           </ul>
         </a-card>

@@ -116,6 +116,9 @@ func Run() error {
 	}
 
 	cfg := config.Load(root)
+	if err := os.MkdirAll(cfg.MediaDir, 0o755); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(cfg.UploadsDir, 0o755); err != nil {
 		return err
 	}
@@ -199,6 +202,7 @@ func (a *App) routes() http.Handler {
 	r.Use(chimw.Recoverer)
 
 	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.Dir(a.cfg.PublicAssetsDir))))
+	r.Handle("/media/*", immutableFileServer("/media/", a.cfg.MediaDir))
 	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir(a.cfg.UploadsDir))))
 	r.Handle("/front/*", http.StripPrefix("/front/", http.FileServer(http.Dir(a.cfg.FrontendDistDir))))
 
@@ -245,6 +249,8 @@ func (a *App) routes() http.Handler {
 		admin.With(a.requireAdmin).Get("/api/admin/agent-keys", a.handleAdminAgentKeys)
 		admin.With(a.requireAdmin).Post("/api/admin/agent-keys", a.handleAdminCreateAgentKey)
 		admin.With(a.requireAdmin).Delete("/api/admin/agent-keys/{id}", a.handleAdminRevokeAgentKey)
+		admin.With(a.requireAdmin).Post("/api/admin/media/images", a.handleAdminMediaImageUpload)
+		admin.With(a.requireAdmin).Post("/api/admin/media/import", a.handleAdminMediaImport)
 		admin.With(a.requireAdmin).Post("/api/admin/upload/image", a.handleAdminImageUpload)
 	})
 

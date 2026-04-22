@@ -475,7 +475,7 @@ curl %s/api/agent/posts \
 ## Constraints
 
 - The skills endpoint is documentation only; it does not perform operations
-- Image upload for post content is still handled by the admin upload endpoint, not by the agent API
+- Image upload for post content is handled by the admin media endpoints, not by the agent API
 - Unknown fields are rejected on create and full update requests
 `, a.cfg.SiteName, baseURL, baseURL, baseURL, baseURL, baseURL)
 	return strings.NewReplacer(
