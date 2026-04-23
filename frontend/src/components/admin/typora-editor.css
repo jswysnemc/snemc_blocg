@@ -58,6 +58,13 @@
   color: var(--editor-primary);
 }
 
+.typora-tool:disabled,
+.typora-editor .table-toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  transform: none;
+}
+
 .typora-tool.secondary {
   background: rgba(246, 248, 252, 0.9);
 }
@@ -111,7 +118,27 @@
     linear-gradient(180deg, var(--editor-paper-strong) 0%, var(--editor-paper) 100%);
 }
 
+.typora-editor .editor-source {
+  width: 100%;
+  min-height: 72vh;
+  padding: 34px clamp(22px, 4vw, 72px) 120px;
+  border: 0;
+  resize: none;
+  background:
+    radial-gradient(circle at top right, rgba(22, 93, 255, 0.04), transparent 28%),
+    linear-gradient(180deg, var(--editor-paper-strong) 0%, var(--editor-paper) 100%);
+  color: var(--editor-text);
+  font-size: 14px;
+  line-height: 1.75;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  outline: none;
+  white-space: pre;
+  overflow: auto;
+  box-sizing: border-box;
+}
+
 .typora-editor .ProseMirror {
+  display: block !important;
   min-height: 72vh;
   padding: 34px clamp(22px, 4vw, 72px) 120px;
   font-size: 15px;
@@ -143,6 +170,12 @@
     height: 100%;
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+
+  .typora-editor .editor-source {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
   }
 
   .typora-editor .ProseMirror {
@@ -199,6 +232,46 @@
 
 .typora-editor .ProseMirror li + li {
   margin-top: 8px;
+}
+
+.typora-editor .ProseMirror li[data-task-item="true"] {
+  list-style: none;
+}
+
+.typora-editor .pm-task-item-shell {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.typora-editor .pm-task-item-checkbox {
+  width: 16px;
+  height: 16px;
+  margin: 0.42em 0 0;
+  flex: 0 0 auto;
+  accent-color: var(--editor-primary);
+}
+
+.typora-editor .pm-task-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.typora-editor .pm-task-item-content > :first-child {
+  margin-top: 0;
+}
+
+.typora-editor .pm-task-item-content > :last-child {
+  margin-bottom: 0;
+}
+
+.typora-editor .ProseMirror li[data-task-item="true"][data-checked="true"] .pm-task-item-content {
+  color: var(--editor-text-soft);
+}
+
+.typora-editor .ProseMirror li[data-task-item="true"][data-checked="true"] .pm-task-item-content > p {
+  text-decoration: line-through;
+  text-decoration-color: rgba(78, 89, 105, 0.55);
 }
 
 .typora-editor .ProseMirror a {
@@ -740,10 +813,12 @@
 
 .typora-editor .mermaid-render {
   padding: 18px 24px;
-  min-height: 64px;
+  min-height: 96px;
   overflow-x: auto;
+  overflow-y: hidden;
   display: flex;
   justify-content: center;
+  align-items: flex-start;
 }
 
 .typora-editor .pm-mermaid-block[data-mode="render"] .mermaid-render {
@@ -765,7 +840,7 @@
 
 .typora-editor .mermaid-editor {
   width: 100%;
-  min-height: 80px;
+  min-height: 140px;
   margin: 0;
   padding: 18px;
   border: 0;
@@ -777,6 +852,8 @@
   font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
   outline: none;
   white-space: pre;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .typora-editor .mermaid-error {
@@ -784,9 +861,22 @@
   font-size: 0.9rem;
 }
 
-.typora-editor .mermaid-render svg {
-  max-width: 100%;
+.typora-editor .mermaid-render svg,
+.typora-editor .mermaid-render img {
+  width: min(100%, var(--mermaid-preview-width, 860px));
+  max-width: none;
+  max-height: none;
   height: auto;
+  display: block;
+  margin: 0 auto;
+  flex: 0 0 auto;
+}
+
+.typora-editor .mermaid-render .mermaid-render-image {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
 }
 
 @media (max-width: 760px) {
@@ -804,8 +894,22 @@
   }
 
   .typora-editor .editor-host,
+  .typora-editor .editor-source,
   .typora-editor .ProseMirror {
     min-height: 62vh;
+  }
+
+  .typora-editor .editor-source {
+    padding: 24px 18px 84px;
+  }
+
+  .typora-editor .mermaid-render {
+    padding: 16px;
+  }
+
+  .typora-editor .mermaid-render svg,
+  .typora-editor .mermaid-render img {
+    width: min(100%, var(--mermaid-preview-width, 100%));
   }
 
   .typora-editor .ProseMirror {

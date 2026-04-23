@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Message } from "@arco-design/web-vue";
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { createTyporaEditor } from "./typora-core";
 
 type ToolbarState = {
@@ -26,16 +26,20 @@ const emit = defineEmits<{
 
 const editorHost = ref<HTMLDivElement | null>(null);
 const imageInput = ref<HTMLInputElement | null>(null);
+const sourceTextarea = ref<HTMLTextAreaElement | null>(null);
 const statusText = ref("Markdown 实时同步");
 const statsText = ref("0 块 · 0 字符");
 const tableToolsVisible = ref(false);
 const activeCommands = ref<Record<string, boolean>>({});
+const sourceMode = ref(false);
+const sourceMarkdown = ref(props.modelValue);
 let editor: ReturnType<typeof createTyporaEditor> | null = null;
 let lastMarkdown = props.modelValue;
 let pasteHandler: ((event: ClipboardEvent) => void) | null = null;
 let dragOverHandler: ((event: DragEvent) => void) | null = null;
 let dropHandler: ((event: DragEvent) => void) | null = null;
 let scrollHandler: (() => void) | null = null;
+let focusOutHandler: ((event: FocusEvent) => void) | null = null;
 
 const commandGroups = [
   [
@@ -76,6 +80,11 @@ function preventToolbarBlur(event: PointerEvent) {
 }
 
 function handleToolbarState(nextState: ToolbarState) {
+  if (sourceMode.value) {
+    activeCommands.value = {};
+    tableToolsVisible.value = false;
+    return;
+  }
   activeCommands.value = nextState.activeCommands;
   tableToolsVisible.value = nextState.tableToolsVisible;
 }
@@ -89,16 +98,104 @@ function handleChange(markdown: string) {
   emit("update:modelValue", markdown);
 }
 
+function buildSourceStats(markdown: string) {
+  const lineCount = markdown === "" ? 1 : markdown.split("\n").length;
+  const characters = markdown.replace(/\s+/g, "").length;
+  return `${lineCount} 行 · ${characters} 字符`;
+}
+
+function syncSourceMeta(markdown: string) {
+  statusText.value = "Markdown 源码模式";
+  statsText.value = buildSourceStats(markdown);
+  activeCommands.value = {};
+  tableToolsVisible.value = false;
+}
+
+function updateSourceMarkdown(markdown: string, options: { emitChange?: boolean } = {}) {
+  sourceMarkdown.value = markdown;
+  lastMarkdown = markdown;
+  if (options.emitChange !== false) {
+    emit("update:modelValue", markdown);
+  }
+  if (sourceMode.value) {
+    syncSourceMeta(markdown);
+  }
+}
+
+async function toggleEditorMode() {
+  if (sourceMode.value) {
+    sourceMode.value = false;
+    statusText.value = "Markdown 实时同步";
+    editor?.setMarkdown(sourceMarkdown.value);
+    await nextTick();
+    editor?.focus();
+    return;
+  }
+
+  editor?.flushPendingSync();
+  const markdown = editor?.getMarkdown() ?? props.modelValue;
+  updateSourceMarkdown(markdown);
+  sourceMode.value = true;
+  syncSourceMeta(markdown);
+  await nextTick();
+  sourceTextarea.value?.focus();
+}
+
+function handleSourceInput(event: Event) {
+  const target = event.target as HTMLTextAreaElement;
+  updateSourceMarkdown(target.value);
+}
+
+function handleSourceScroll(event: Event) {
+  const target = event.target as HTMLTextAreaElement;
+  emit("editor-scroll", target.scrollTop);
+}
+
+async function insertSourceText(text: string) {
+  const textarea = sourceTextarea.value;
+  if (!textarea) {
+    updateSourceMarkdown(sourceMarkdown.value + text);
+    await nextTick();
+    sourceTextarea.value?.focus();
+    return;
+  }
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const nextMarkdown =
+    sourceMarkdown.value.slice(0, start) +
+    text +
+    sourceMarkdown.value.slice(end);
+
+  updateSourceMarkdown(nextMarkdown);
+  await nextTick();
+  const nextPosition = start + text.length;
+  textarea.focus();
+  textarea.setSelectionRange(nextPosition, nextPosition);
+}
+
 function runCommand(command: string) {
+  if (sourceMode.value) {
+    return;
+  }
   editor?.runCommand(command);
 }
 
 function runTableCommand(command: string) {
+  if (sourceMode.value) {
+    return;
+  }
   editor?.runTableCommand(command);
 }
 
 async function copyMarkdown() {
   try {
+    if (sourceMode.value) {
+      await navigator.clipboard.writeText(sourceMarkdown.value);
+      Message.success("Markdown 已复制");
+      return;
+    }
+
     await editor?.copyMarkdown();
   } catch {
     Message.error("复制失败");
@@ -106,7 +203,18 @@ async function copyMarkdown() {
 }
 
 function downloadMarkdown() {
-  editor?.downloadMarkdown();
+  if (!sourceMode.value) {
+    editor?.downloadMarkdown();
+    return;
+  }
+
+  const blob = new Blob([sourceMarkdown.value], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "web-typora-demo.md";
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 function openImagePicker() {
@@ -149,6 +257,11 @@ async function handleImageSelection(event: Event) {
 async function insertImageFile(file: File) {
   try {
     const url = await uploadImage(file);
+    if (sourceMode.value) {
+      await insertSourceText(`![${file.name}](${url})`);
+      return;
+    }
+
     editor?.insertImage(url, { alt: file.name });
   } catch (error) {
     Message.error(error instanceof Error ? error.message : "上传失败");
@@ -178,6 +291,11 @@ async function insertRemoteImage() {
     if (typeof url !== "string" || !url) {
       throw new Error("远程图片地址无效");
     }
+    if (sourceMode.value) {
+      await insertSourceText(`![](${url})`);
+      return;
+    }
+
     editor?.insertImage(url);
   } catch (error) {
     Message.error(error instanceof Error ? error.message : "远程图片接入失败");
@@ -233,20 +351,38 @@ onMounted(() => {
     emit("editor-scroll", editorHost.value?.scrollTop ?? 0);
   };
 
+  focusOutHandler = () => {
+    window.requestAnimationFrame(() => {
+      if (!editorHost.value?.contains(document.activeElement)) {
+        editor?.flushPendingSync();
+      }
+    });
+  };
+
   editorHost.value.addEventListener("paste", pasteHandler);
   editorHost.value.addEventListener("dragover", dragOverHandler);
   editorHost.value.addEventListener("drop", dropHandler);
   editorHost.value.addEventListener("scroll", scrollHandler, { passive: true });
+  editorHost.value.addEventListener("focusout", focusOutHandler);
   scrollHandler();
 });
 
 watch(
   () => props.modelValue,
   (value) => {
-    if (!editor || value === lastMarkdown) {
+    if (value === lastMarkdown) {
       return;
     }
+
     lastMarkdown = value;
+    if (sourceMode.value) {
+      sourceMarkdown.value = value;
+      syncSourceMeta(value);
+      return;
+    }
+    if (!editor) {
+      return;
+    }
     editor.setMarkdown(value);
   },
 );
@@ -260,6 +396,10 @@ onBeforeUnmount(() => {
   if (editorHost.value && scrollHandler) {
     editorHost.value.removeEventListener("scroll", scrollHandler);
   }
+  if (editorHost.value && focusOutHandler) {
+    editorHost.value.removeEventListener("focusout", focusOutHandler);
+  }
+  editor?.flushPendingSync();
   editor?.destroy();
 });
 </script>
@@ -273,6 +413,7 @@ onBeforeUnmount(() => {
           :key="command.key"
           type="button"
           class="typora-tool"
+          :disabled="sourceMode"
           :data-active="activeCommands[command.key] ? 'true' : 'false'"
           @click="runCommand(command.key)"
         >
@@ -287,6 +428,14 @@ onBeforeUnmount(() => {
 
       <span class="typora-toolbar-divider"></span>
 
+      <button
+        type="button"
+        class="typora-tool secondary"
+        :data-active="sourceMode ? 'true' : 'false'"
+        @click="toggleEditorMode"
+      >
+        {{ sourceMode ? "排版模式" : "源码模式" }}
+      </button>
       <button type="button" class="typora-tool secondary" @click="openImagePicker">
         图片
       </button>
@@ -308,7 +457,7 @@ onBeforeUnmount(() => {
           <span>{{ statsText }}</span>
         </div>
 
-        <div v-if="tableToolsVisible" class="table-toolbar">
+        <div v-if="tableToolsVisible && !sourceMode" class="table-toolbar">
           <button
             v-for="command in tableCommands"
             :key="command.key"
@@ -320,7 +469,16 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div ref="editorHost" class="editor-host prose"></div>
+      <div v-show="!sourceMode" ref="editorHost" class="editor-host prose"></div>
+      <textarea
+        v-show="sourceMode"
+        ref="sourceTextarea"
+        class="editor-source"
+        :value="sourceMarkdown"
+        spellcheck="false"
+        @input="handleSourceInput"
+        @scroll="handleSourceScroll"
+      ></textarea>
     </div>
 
     <input

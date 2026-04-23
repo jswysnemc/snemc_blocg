@@ -38,7 +38,7 @@ import { baseKeymap, chainCommands, createParagraphNear, exitCode, liftEmptyBloc
 import { undo, redo, history } from "prosemirror-history";
 import { InputRule, inputRules, textblockTypeInputRule, wrappingInputRule } from "prosemirror-inputrules";
 import { keymap } from "prosemirror-keymap";
-import { Schema } from "prosemirror-model";
+import { Fragment, Schema } from "prosemirror-model";
 import { MarkdownParser, MarkdownSerializer, defaultMarkdownParser, defaultMarkdownSerializer, schema as baseMarkdownSchema } from "prosemirror-markdown";
 import { EditorState, Selection, TextSelection } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
@@ -108,6 +108,45 @@ const strikeMarkSpec = {
   },
 };
 
+const baseListItemSpec = baseMarkdownSchema.spec.nodes.get("list_item");
+const taskListItemSpec = {
+  ...baseListItemSpec,
+  attrs: {
+    checked: { default: null },
+  },
+  parseDOM: [{
+    tag: "li",
+    getAttrs(dom) {
+      const rawChecked = dom.getAttribute("data-checked");
+      const isTask = dom.getAttribute("data-task-item") === "true" || rawChecked === "true" || rawChecked === "false";
+      if (!isTask) {
+        return { checked: null };
+      }
+
+      return { checked: rawChecked === "true" };
+    },
+  }],
+  toDOM(node) {
+    if (node.attrs.checked === null) {
+      return ["li", 0];
+    }
+
+    return [
+      "li",
+      {
+        "data-task-item": "true",
+        "data-checked": node.attrs.checked ? "true" : "false",
+      },
+      0,
+    ];
+  },
+};
+
+// Legacy posts may persist Markdown-escaped backslashes inside inline math.
+function normalizeInlineMathFormula(formula) {
+  return markdownTokenizer.utils.unescapeAll(formula || "");
+}
+
 const mathInlineSpec = {
   inline: true,
   group: "inline",
@@ -120,7 +159,7 @@ const mathInlineSpec = {
     tag: "span[data-math-inline]",
     getAttrs(dom) {
       return {
-        formula: dom.getAttribute("data-formula") || dom.textContent || "",
+        formula: normalizeInlineMathFormula(dom.getAttribute("data-formula") || dom.textContent || ""),
       };
     },
   }],
@@ -168,7 +207,7 @@ function inlineMathRule(state, silent) {
 
     if (!silent) {
       const token = state.push("math_inline", "math", 0);
-      token.content = formula;
+      token.content = normalizeInlineMathFormula(formula);
       token.markup = "$";
     }
     state.pos = next + 1;
@@ -184,6 +223,7 @@ function inlineMathPlugin(md) {
 
 const editorSchema = new Schema({
   nodes: baseMarkdownSchema.spec.nodes
+    .update("list_item", taskListItemSpec)
     .append(
       tableNodes({
         tableGroup: "block",
@@ -218,7 +258,7 @@ const markdownParser = new MarkdownParser(editorSchema, markdownTokenizer, {
   math_inline: {
     node: "math_inline",
     getAttrs(token) {
-      return { formula: token.content || "" };
+      return { formula: normalizeInlineMathFormula(token.content || "") };
     },
   },
   s: { mark: "strike" },
@@ -266,7 +306,13 @@ const markdownSerializer = new MarkdownSerializer(
       defaultMarkdownSerializer.nodes.code_block(state, node);
     },
     math_inline(state, node) {
-      state.text(`$${node.attrs.formula || ""}$`, false);
+      state.text(`$${normalizeInlineMathFormula(node.attrs.formula || "")}$`, false);
+    },
+    list_item(state, node) {
+      if (node.attrs.checked !== null) {
+        state.write(node.attrs.checked ? "[x] " : "[ ] ");
+      }
+      state.renderContent(node);
     },
     table(state, node) {
       renderMarkdownTable(state, node);
@@ -368,6 +414,45 @@ let statsCallback = null;
 let toolbarCallback = null;
 let changeCallback = null;
 let readyCallback = null;
+let syncQueued = false;
+let pendingChangeSource = null;
+let syncFrame = 0;
+let lastStatsLabel = "";
+let lastToolbarSignature = "";
+const nativeGetComputedStyle =
+  typeof window !== "undefined" ? window.getComputedStyle.bind(window) : null;
+let computedStyleCacheInstalled = false;
+let cachedRootStyleTarget = null;
+let cachedRootStyle = null;
+
+function installComputedStyleCache() {
+  if (computedStyleCacheInstalled || !nativeGetComputedStyle || typeof window === "undefined") {
+    return;
+  }
+
+  window.getComputedStyle = function getComputedStyleWithCache(target, pseudoElt) {
+    if (target === cachedRootStyleTarget && cachedRootStyle) {
+      const cached = cachedRootStyle;
+      cachedRootStyleTarget = null;
+      cachedRootStyle = null;
+      return cached;
+    }
+
+    return nativeGetComputedStyle(target, pseudoElt);
+  };
+
+  computedStyleCacheInstalled = true;
+}
+
+function primeRootComputedStyle(target) {
+  if (!nativeGetComputedStyle || !(target instanceof HTMLElement)) {
+    return;
+  }
+
+  installComputedStyleCache();
+  cachedRootStyleTarget = target;
+  cachedRootStyle = nativeGetComputedStyle(target);
+}
 
 class CodeBlockView {
   constructor(node, editorView, getPos) {
@@ -833,7 +918,7 @@ class InlineMathView {
   }
 
   render() {
-    const formula = this.node.attrs.formula || "";
+    const formula = normalizeInlineMathFormula(this.node.attrs.formula || "");
     this.dom.dataset.formula = formula;
     this.dom.title = formula;
     this.dom.classList.remove("is-error", "is-empty");
@@ -861,7 +946,7 @@ class InlineMathView {
       return;
     }
 
-    const source = `$${this.node.attrs.formula || ""}$`;
+    const source = `$${normalizeInlineMathFormula(this.node.attrs.formula || "")}$`;
     let tr = this.view.state.tr.replaceWith(pos, pos + this.node.nodeSize, this.view.state.schema.text(source));
     tr = tr.setSelection(TextSelection.create(tr.doc, Math.max(pos + 1, pos + source.length - 1))).scrollIntoView();
     this.view.dispatch(tr);
@@ -885,7 +970,249 @@ class InlineMathView {
   }
 }
 
+class TaskListItemView {
+  constructor(node, editorView, getPos) {
+    this.node = node;
+    this.view = editorView;
+    this.getPos = getPos;
+
+    this.dom = document.createElement("li");
+    this.dom.setAttribute("data-task-item", "true");
+
+    this.shell = document.createElement("div");
+    this.shell.className = "pm-task-item-shell";
+
+    this.checkbox = document.createElement("input");
+    this.checkbox.type = "checkbox";
+    this.checkbox.className = "pm-task-item-checkbox";
+    this.checkbox.tabIndex = -1;
+    this.checkbox.contentEditable = "false";
+    this.checkbox.setAttribute("aria-label", "切换任务状态");
+
+    this.contentDOM = document.createElement("div");
+    this.contentDOM.className = "pm-task-item-content";
+
+    this.shell.append(this.checkbox, this.contentDOM);
+    this.dom.append(this.shell);
+
+    this.checkbox.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+    });
+    this.checkbox.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.toggleChecked();
+    });
+
+    this.render();
+  }
+
+  update(node) {
+    if (node.type !== this.node.type || node.attrs.checked === null) {
+      return false;
+    }
+
+    this.node = node;
+    this.render();
+    return true;
+  }
+
+  render() {
+    const checked = Boolean(this.node.attrs.checked);
+    this.dom.dataset.checked = checked ? "true" : "false";
+    this.dom.setAttribute("data-checked", checked ? "true" : "false");
+    this.checkbox.checked = checked;
+  }
+
+  toggleChecked() {
+    const pos = this.getPos();
+    if (typeof pos !== "number") {
+      return;
+    }
+
+    const attrs = {
+      ...this.node.attrs,
+      checked: !this.node.attrs.checked,
+    };
+    const transaction = this.view.state.tr.setNodeMarkup(pos, undefined, attrs).scrollIntoView();
+    this.view.dispatch(transaction);
+    this.view.focus();
+  }
+
+  ignoreMutation(record) {
+    return record.target === this.checkbox || this.checkbox.contains(record.target);
+  }
+
+  stopEvent(event) {
+    return this.checkbox.contains(event.target);
+  }
+}
+
 let mermaidCounter = 0;
+let mermaidInitialized = false;
+
+function ensureMermaidInitialized() {
+  if (mermaidInitialized) {
+    return;
+  }
+
+  mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+  mermaidInitialized = true;
+}
+
+function parseSvgLength(value) {
+  if (!value) {
+    return null;
+  }
+
+  const match = /-?\d+(?:\.\d+)?/.exec(String(value));
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeMermaidSvg(svgMarkup) {
+  if (typeof DOMParser === "undefined" || typeof XMLSerializer === "undefined") {
+    return {
+      markup: svgMarkup,
+      width: null,
+      height: null,
+    };
+  }
+
+  try {
+    const document = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
+    const svg = document.documentElement;
+
+    if (!svg || svg.nodeName.toLowerCase() !== "svg") {
+      return {
+        markup: svgMarkup,
+        width: null,
+        height: null,
+      };
+    }
+
+    let width = parseSvgLength(svg.getAttribute("width"));
+    let height = parseSvgLength(svg.getAttribute("height"));
+
+    const viewBox = svg.getAttribute("viewBox") || "";
+    const viewBoxParts = viewBox
+      .trim()
+      .split(/[\s,]+/)
+      .map((part) => Number.parseFloat(part))
+      .filter((part) => Number.isFinite(part));
+
+    if ((!width || !height) && viewBoxParts.length === 4) {
+      width = width || viewBoxParts[2];
+      height = height || viewBoxParts[3];
+    }
+
+    const style = svg.getAttribute("style") || "";
+    const maxWidthMatch = /max-width:\s*([0-9.]+)px/i.exec(style);
+    if (!width && maxWidthMatch) {
+      width = Number.parseFloat(maxWidthMatch[1]);
+    }
+
+    if (width && height) {
+      svg.setAttribute("width", String(width));
+      svg.setAttribute("height", String(height));
+    }
+
+    const normalizedStyle = style
+      .replace(/(?:^|;)\s*max-width\s*:[^;]+;?/gi, ";")
+      .replace(/^\s*;|;\s*$/g, "")
+      .trim();
+
+    if (normalizedStyle) {
+      svg.setAttribute("style", normalizedStyle);
+    } else {
+      svg.removeAttribute("style");
+    }
+
+    return {
+      markup: new XMLSerializer().serializeToString(svg),
+      width,
+      height,
+    };
+  } catch {
+    return {
+      markup: svgMarkup,
+      width: null,
+      height: null,
+    };
+  }
+}
+
+function getMermaidPreviewMetrics(width, height) {
+  const portrait = Boolean(width && height && height > width * 1.2);
+  const maxWidth = portrait ? 560 : 860;
+  const maxHeight = portrait ? 920 : 640;
+  const minWidth = portrait ? 260 : 420;
+
+  if (!width || !height) {
+    return {
+      orientation: portrait ? "portrait" : "landscape",
+      targetWidth: maxWidth,
+    };
+  }
+
+  const widthFromHeight = Math.round((maxHeight * width) / height);
+  return {
+    orientation: portrait ? "portrait" : "landscape",
+    targetWidth: Math.min(maxWidth, Math.max(minWidth, widthFromHeight)),
+  };
+}
+
+function createMermaidSvgElement(svgMarkup) {
+  if (typeof DOMParser === "undefined" || typeof document === "undefined") {
+    return null;
+  }
+
+  try {
+    const parsed = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
+    const svg = parsed.documentElement;
+    if (!svg || svg.nodeName.toLowerCase() !== "svg") {
+      return null;
+    }
+    return document.importNode(svg, true);
+  } catch {
+    return null;
+  }
+}
+
+function trimMermaidSvgViewBox(svg) {
+  if (!(svg instanceof SVGSVGElement) || typeof svg.getBBox !== "function") {
+    return null;
+  }
+
+  try {
+    const bounds = svg.getBBox();
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+      return null;
+    }
+
+    const paddingX = Math.max(16, bounds.width * 0.04);
+    const paddingY = Math.max(16, bounds.height * 0.06);
+    const viewBoxX = bounds.x - paddingX;
+    const viewBoxY = bounds.y - paddingY;
+    const viewBoxWidth = bounds.width + paddingX * 2;
+    const viewBoxHeight = bounds.height + paddingY * 2;
+
+    svg.setAttribute("viewBox", `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`);
+    svg.setAttribute("width", String(viewBoxWidth));
+    svg.setAttribute("height", String(viewBoxHeight));
+
+    return {
+      width: viewBoxWidth,
+      height: viewBoxHeight,
+    };
+  } catch {
+    return null;
+  }
+}
 
 class MathBlockView {
   constructor(node, editorView, getPos) {
@@ -1053,6 +1380,8 @@ class MermaidBlockView {
     this.updating = false;
     this.sourceMode = false;
     this.renderId = `mermaid-${++mermaidCounter}`;
+    this.renderUrl = null;
+    this.renderVersion = 0;
 
     this.dom = document.createElement("section");
     this.dom.className = "pm-mermaid-block";
@@ -1091,12 +1420,18 @@ class MermaidBlockView {
       this.sourceMode = !this.sourceMode;
       this.dom.dataset.mode = this.sourceMode ? "source" : "render";
       this.toggleBtn.textContent = this.sourceMode ? "预览" : "源码";
-      if (!this.sourceMode) {
+      if (this.sourceMode) {
+        window.requestAnimationFrame(() => {
+          this.adjustSourceHeight();
+          this.textarea.focus();
+        });
+      } else {
         this.renderMermaid();
       }
     });
 
     this.textarea.addEventListener("input", () => {
+      this.adjustSourceHeight();
       this.forwardText();
     });
 
@@ -1126,7 +1461,9 @@ class MermaidBlockView {
     const textChanged = !this.updating && this.textarea.value !== node.textContent;
     if (textChanged) {
       this.textarea.value = node.textContent;
-      if (!this.sourceMode) {
+      if (this.sourceMode) {
+        this.adjustSourceHeight();
+      } else {
         this.renderMermaid();
       }
     }
@@ -1135,26 +1472,92 @@ class MermaidBlockView {
 
   selectNode() {
     if (this.sourceMode) {
+      this.adjustSourceHeight();
       this.textarea.focus();
     }
+  }
+
+  destroy() {
+    this.renderVersion += 1;
+    this.clearRenderedDiagram();
   }
 
   stopEvent() { return true; }
   ignoreMutation() { return true; }
 
+  clearRenderedDiagram() {
+    if (this.renderUrl) {
+      URL.revokeObjectURL(this.renderUrl);
+      this.renderUrl = null;
+    }
+    delete this.renderContainer.dataset.orientation;
+    this.renderContainer.style.removeProperty("--mermaid-preview-width");
+  }
+
+  showRenderMessage(className, message) {
+    this.clearRenderedDiagram();
+    const hint = document.createElement("span");
+    hint.className = className;
+    hint.textContent = message;
+    this.renderContainer.replaceChildren(hint);
+  }
+
+  showRenderedDiagram(svg) {
+    this.clearRenderedDiagram();
+    const normalizedSvg = normalizeMermaidSvg(svg);
+    const svgElement = createMermaidSvgElement(normalizedSvg.markup);
+    if (!svgElement) {
+      this.showRenderMessage("mermaid-error", "Mermaid 预览生成失败");
+      return;
+    }
+
+    svgElement.setAttribute("role", "img");
+    svgElement.setAttribute("aria-label", "Mermaid 图表预览");
+    this.renderContainer.replaceChildren(svgElement);
+
+    window.requestAnimationFrame(() => {
+      if (!svgElement.isConnected) {
+        return;
+      }
+
+      const trimmed = trimMermaidSvgViewBox(svgElement);
+      const metrics = getMermaidPreviewMetrics(
+        trimmed?.width || normalizedSvg.width,
+        trimmed?.height || normalizedSvg.height,
+      );
+      this.renderContainer.dataset.orientation = metrics.orientation;
+      this.renderContainer.style.setProperty("--mermaid-preview-width", `${metrics.targetWidth}px`);
+    });
+  }
+
   async renderMermaid() {
+    const currentVersion = ++this.renderVersion;
     const content = this.textarea.value.trim();
     if (!content) {
-      this.renderContainer.innerHTML = '<span class="mermaid-placeholder">输入 Mermaid 图表定义</span>';
+      this.showRenderMessage("mermaid-placeholder", "输入 Mermaid 图表定义");
       return;
     }
     try {
-      mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+      ensureMermaidInitialized();
       const { svg } = await mermaid.render(this.renderId, content);
-      this.renderContainer.innerHTML = svg;
+      if (currentVersion !== this.renderVersion) {
+        return;
+      }
+      this.showRenderedDiagram(svg);
     } catch {
-      this.renderContainer.innerHTML = '<span class="mermaid-error">Mermaid 语法错误</span>';
+      if (currentVersion !== this.renderVersion) {
+        return;
+      }
+      this.showRenderMessage("mermaid-error", "Mermaid 语法错误");
     }
+  }
+
+  adjustSourceHeight() {
+    this.textarea.style.height = "0px";
+    const contentHeight = this.textarea.scrollHeight;
+    const lineHeight = parseFloat(getComputedStyle(this.textarea).lineHeight) || 26;
+    const minHeight = Math.max(lineHeight * 6, 140);
+    this.textarea.style.height = `${Math.max(contentHeight, minHeight)}px`;
   }
 
   forwardText() {
@@ -1698,6 +2101,75 @@ function normalizeSerializedMarkdown(markdown) {
   return markdown.replace(/^((?:\s*)(?:[-+*]|\d+\.)\s+)\\\[( |x|X)\\\](\s+)/gm, "$1[$2]$3");
 }
 
+function stripTaskMarkerFromParagraph(paragraph) {
+  const firstChild = paragraph.firstChild;
+  if (!firstChild?.isText) {
+    return null;
+  }
+
+  const match = /^\[( |x|X)\]\s*/.exec(firstChild.text || "");
+  if (!match) {
+    return null;
+  }
+
+  const checked = match[1].toLowerCase() === "x";
+  const remaining = (firstChild.text || "").slice(match[0].length);
+  const children = [];
+
+  if (remaining.length > 0) {
+    children.push(editorSchema.text(remaining, firstChild.marks));
+  }
+  for (let index = 1; index < paragraph.childCount; index += 1) {
+    children.push(paragraph.child(index));
+  }
+
+  return {
+    checked,
+    paragraph: paragraph.copy(Fragment.fromArray(children)),
+  };
+}
+
+function normalizeTaskListNode(node) {
+  let changed = false;
+  const children = [];
+
+  node.forEach((child) => {
+    const normalizedChild = normalizeTaskListNode(child);
+    if (normalizedChild !== child) {
+      changed = true;
+    }
+    children.push(normalizedChild);
+  });
+
+  let nextNode = changed ? node.copy(Fragment.fromArray(children)) : node;
+
+  if (nextNode.type === editorSchema.nodes.list_item) {
+    const firstBlock = nextNode.firstChild;
+    if (firstBlock?.type === editorSchema.nodes.paragraph) {
+      const taskState = stripTaskMarkerFromParagraph(firstBlock);
+      if (taskState) {
+        const updatedChildren = [taskState.paragraph];
+        for (let index = 1; index < nextNode.childCount; index += 1) {
+          updatedChildren.push(nextNode.child(index));
+        }
+        return nextNode.type.create(
+          {
+            ...nextNode.attrs,
+            checked: taskState.checked,
+          },
+          Fragment.fromArray(updatedChildren),
+        );
+      }
+    }
+  }
+
+  return nextNode;
+}
+
+function normalizeTaskListDocument(doc) {
+  return normalizeTaskListNode(doc);
+}
+
 function splitMarkdownTableCells(text) {
   const line = text.trim();
 
@@ -1864,6 +2336,119 @@ function toggleCodeBlock() {
   };
 }
 
+function createTextMarkInputRule(pattern, marks, options = {}) {
+  return new InputRule(pattern, (state, match, start, end) => {
+    const content = match[1] || "";
+    if (!content.trim()) {
+      return null;
+    }
+
+    if (options.disallowEdgeWhitespace && content !== content.trim()) {
+      return null;
+    }
+
+    const markList = marks
+      .map((markType) => {
+        if (!markType) {
+          return null;
+        }
+
+        const attrs = typeof options.getAttrs === "function" ? options.getAttrs(match, markType) : null;
+        return markType.create(attrs || undefined);
+      })
+      .filter(Boolean);
+
+    if (markList.length === 0) {
+      return null;
+    }
+
+    return state.tr.replaceWith(start, end, editorSchema.text(content, markList));
+  });
+}
+
+function createLinkInputRule() {
+  return new InputRule(/\[([^\]\n]+)\]\(([^()\s]+(?:\([^)\s]*\)[^)\s]*)*)\)$/, (state, match, start, end) => {
+    const text = match[1] || "";
+    const href = match[2] || "";
+    if (!text.trim() || !href.trim()) {
+      return null;
+    }
+
+    const linkMark = editorSchema.marks.link;
+    if (!linkMark) {
+      return null;
+    }
+
+    return state.tr.replaceWith(
+      start,
+      end,
+      editorSchema.text(text, [linkMark.create({ href, title: null })]),
+    );
+  });
+}
+
+function createImageInputRule() {
+  return new InputRule(/!\[([^\]\n]*)\]\(([^()\s]+(?:\([^)\s]*\)[^)\s]*)*)\)$/, (state, match, start, end) => {
+    const src = (match[2] || "").trim();
+    if (!src) {
+      return null;
+    }
+
+    const imageNode = editorSchema.nodes.image?.create({
+      src,
+      alt: match[1] || "",
+      title: null,
+    });
+    if (!imageNode) {
+      return null;
+    }
+
+    return state.tr.replaceWith(start, end, imageNode);
+  });
+}
+
+function createHorizontalRuleInputRule() {
+  return new InputRule(/^(?:---|\*\*\*|___)$/, (state, _match, _start, _end) => {
+    const { $from } = state.selection;
+    if ($from.depth !== 1 || $from.parent.type !== editorSchema.nodes.paragraph) {
+      return null;
+    }
+
+    const blockStart = $from.before(1);
+    const blockEnd = blockStart + $from.parent.nodeSize;
+    const divider = editorSchema.nodes.horizontal_rule?.create();
+    const paragraph = editorSchema.nodes.paragraph?.create();
+    if (!divider || !paragraph) {
+      return null;
+    }
+
+    const fragment = Fragment.fromArray([divider, paragraph]);
+    const tr = state.tr.replaceWith(blockStart, blockEnd, fragment);
+    return tr.setSelection(TextSelection.create(tr.doc, blockStart + divider.nodeSize + 1)).scrollIntoView();
+  });
+}
+
+function createTaskListInputRule() {
+  return new InputRule(/^\[( |x|X)\]\s$/, (state, match, start, end) => {
+    const { $from } = state.selection;
+    const listItemDepth = $from.depth - 1;
+    if (listItemDepth < 1 || $from.node(listItemDepth).type !== editorSchema.nodes.list_item) {
+      return null;
+    }
+
+    const listItemPos = $from.before(listItemDepth);
+    const listItemNode = $from.node(listItemDepth);
+    const checked = match[1].toLowerCase() === "x";
+
+    let tr = state.tr.delete(start, end);
+    tr = tr.setNodeMarkup(listItemPos, undefined, {
+      ...listItemNode.attrs,
+      checked,
+    });
+    return tr;
+  });
+}
+
 function buildInputRules() {
   const rules = [
     textblockTypeInputRule(/^(#{1,6})\s$/, editorSchema.nodes.heading, (match) => ({ level: match[1].length })),
@@ -1875,16 +2460,41 @@ function buildInputRules() {
       (match) => ({ order: Number.parseInt(match[1], 10) || 1 }),
       (match, node) => node.childCount + node.attrs.order === Number.parseInt(match[1], 10),
     ),
-    new InputRule(/~~([^~]+)~~$/, (state, match, start, end) => {
-      const text = match[1];
-      const strikeMark = editorSchema.marks.strike;
-      const { tr } = state;
-
-      tr.replaceWith(start, end, editorSchema.text(text, [strikeMark.create()]));
-      return tr;
-    }),
+    createTaskListInputRule(),
+    createHorizontalRuleInputRule(),
+    createTextMarkInputRule(
+      /\*\*\*([^*\n](?:[^*\n]*?[^*\s\n])?)\*\*\*$/,
+      [editorSchema.marks.strong, editorSchema.marks.em],
+      { disallowEdgeWhitespace: true },
+    ),
+    createTextMarkInputRule(
+      /___([^_\n](?:[^_\n]*?[^_\s\n])?)___$/,
+      [editorSchema.marks.strong, editorSchema.marks.em],
+      { disallowEdgeWhitespace: true },
+    ),
+    createTextMarkInputRule(
+      /\*\*([^*\n](?:[^*\n]*?[^*\s\n])?)\*\*$/,
+      [editorSchema.marks.strong],
+      { disallowEdgeWhitespace: true },
+    ),
+    createTextMarkInputRule(
+      /__([^_\n](?:[^_\n]*?[^_\s\n])?)__$/,
+      [editorSchema.marks.strong],
+      { disallowEdgeWhitespace: true },
+    ),
+    createTextMarkInputRule(
+      /\*([^*\n](?:[^*\n]*?[^*\s\n])?)\*$/,
+      [editorSchema.marks.em],
+      { disallowEdgeWhitespace: true },
+    ),
+    createTextMarkInputRule(
+      /_([^_\n](?:[^_\n]*?[^_\s\n])?)_$/,
+      [editorSchema.marks.em],
+      { disallowEdgeWhitespace: true },
+    ),
+    createTextMarkInputRule(/~~([^~\n]+)~~$/, [editorSchema.marks.strike], { disallowEdgeWhitespace: true }),
     new InputRule(/\$([^$\n]+)\$$/, (state, match, start, end) => {
-      const formula = match[1];
+      const formula = normalizeInlineMathFormula(match[1]);
       const mathInline = editorSchema.nodes.math_inline.create({ formula });
       const { tr } = state;
 
@@ -1915,14 +2525,9 @@ function buildInputRules() {
       tr.setSelection(TextSelection.create(tr.doc, getTableCellTextPosition(previousPos, table, 1, 0))).scrollIntoView();
       return tr;
     }),
-    new InputRule(/`([^`]+)`$/, (state, match, start, end) => {
-      const text = match[1];
-      const codeMark = editorSchema.marks.code;
-      const { tr } = state;
-
-      tr.replaceWith(start, end, editorSchema.text(text, [codeMark.create()]));
-      return tr;
-    }),
+    createTextMarkInputRule(/`([^`\n]+)`$/, [editorSchema.marks.code], { disallowEdgeWhitespace: true }),
+    createImageInputRule(),
+    createLinkInputRule(),
   ];
 
   return inputRules({ rules });
@@ -1950,6 +2555,25 @@ function arrowHandler(direction) {
     }
 
     return false;
+  };
+}
+
+function splitTaskListItem(itemType) {
+  return (state, dispatch) => {
+    const { $from } = state.selection;
+    if ($from.depth < 2) {
+      return false;
+    }
+
+    const listItem = $from.node(-1);
+    if (listItem.type !== itemType || listItem.attrs.checked === null) {
+      return false;
+    }
+
+    return splitListItem(itemType, {
+      ...listItem.attrs,
+      checked: false,
+    })(state, dispatch);
   };
 }
 
@@ -2167,12 +2791,12 @@ function deleteLineWhenFullySelected(state, dispatch) {
 
 function createState(markdown) {
   let state = EditorState.create({
-    doc: markdownParser.parse(preprocessMarkdown(markdown)),
+    doc: normalizeTaskListDocument(markdownParser.parse(preprocessMarkdown(markdown))),
     plugins: [
       history(),
       buildInputRules(),
       keymap({
-        Enter: chainCommands(markdownTableHandler(), mathFenceHandler(), codeFenceHandler(), splitListItem(editorSchema.nodes.list_item), createParagraphNear, liftEmptyBlock, splitBlock),
+        Enter: chainCommands(markdownTableHandler(), mathFenceHandler(), codeFenceHandler(), splitTaskListItem(editorSchema.nodes.list_item), splitListItem(editorSchema.nodes.list_item), createParagraphNear, liftEmptyBlock, splitBlock),
         Tab: chainCommands(goToNextCell(1), sinkListItem(editorSchema.nodes.list_item)),
         "Shift-Tab": chainCommands(goToNextCell(-1), liftListItem(editorSchema.nodes.list_item)),
         "Mod-z": undo,
@@ -2229,14 +2853,73 @@ function flashStatus(message) {
 
 function updateStats(state) {
   const characters = state.doc.textContent.replace(/\s+/g, "").length;
-  if (statsCallback) {
+  const label = `${state.doc.childCount} 块 · ${characters} 字符`;
+
+  if (statsCallback && label !== lastStatsLabel) {
+    lastStatsLabel = label;
     statsCallback({
       blocks: state.doc.childCount,
       characters,
-      label: `${state.doc.childCount} 块 · ${characters} 字符`,
+      label,
     });
   }
+
   updateToolbarState(state);
+}
+
+function flushEditorSync() {
+  syncQueued = false;
+  syncFrame = 0;
+
+  if (!view) {
+    pendingChangeSource = null;
+    return;
+  }
+
+  updateStats(view.state);
+
+  if (pendingChangeSource && changeCallback) {
+    const source = pendingChangeSource;
+    pendingChangeSource = null;
+    changeCallback(serializeMarkdown(), { source });
+  }
+}
+
+function scheduleEditorSync(options = {}) {
+  const { docChanged = false, source = "input" } = options;
+
+  if (docChanged) {
+    pendingChangeSource = source;
+  }
+
+  if (syncQueued) {
+    return;
+  }
+
+  syncQueued = true;
+  syncFrame = window.requestAnimationFrame(flushEditorSync);
+}
+
+function flushEditorSyncNow(options = {}) {
+  const { docChanged = false, source = "input" } = options;
+
+  if (docChanged) {
+    pendingChangeSource = source;
+  }
+
+  if (syncFrame) {
+    window.cancelAnimationFrame(syncFrame);
+    syncFrame = 0;
+  }
+
+  flushEditorSync();
+}
+
+function handleEditorScrollToSelection(currentView) {
+  if (!currentView?.dom?.isConnected) {
+    return true;
+  }
+  return true;
 }
 
 function hasAncestor($pos, nodeType) {
@@ -2279,8 +2962,10 @@ function updateToolbarState(state) {
     mathBlock: inCodeBlock && codeBlockParams === "math",
     mermaidBlock: inCodeBlock && codeBlockParams === "mermaid",
   };
+  const signature = `${inTable ? 1 : 0}:${Object.values(buttonMap).map((value) => (value ? "1" : "0")).join("")}`;
 
-  if (toolbarCallback) {
+  if (toolbarCallback && signature !== lastToolbarSignature) {
+    lastToolbarSignature = signature;
     toolbarCallback({
       activeCommands: buttonMap,
       tableToolsVisible: inTable,
@@ -2312,10 +2997,7 @@ function runTableCommand(command) {
 
 function replaceDocument(markdown) {
   view.updateState(createState(markdown));
-  updateStats(view.state);
-  if (changeCallback) {
-    changeCallback(serializeMarkdown(), { source: "replace" });
-  }
+  flushEditorSyncNow({ docChanged: true, source: "replace" });
   view.focus();
 }
 
@@ -2379,13 +3061,26 @@ export function createTyporaEditor(options) {
   changeCallback = onChange || null;
   readyCallback = onReady || null;
   persistentStatus = "Markdown 实时同步";
+  syncQueued = false;
+  pendingChangeSource = null;
+  syncFrame = 0;
+  lastStatsLabel = "";
+  lastToolbarSignature = "";
   element.innerHTML = "";
 
   view = new EditorView(element, {
     state: createState(markdown),
+    handleScrollToSelection: handleEditorScrollToSelection,
     nodeViews: {
       math_inline(node, editorView, getPos) {
         return new InlineMathView(node, editorView, getPos);
+      },
+      list_item(node, editorView, getPos) {
+        if (node.attrs.checked === null) {
+          return undefined;
+        }
+
+        return new TaskListItemView(node, editorView, getPos);
       },
       table(node, editorView, getPos) {
         return new AdjustableTableView(node, editorView, getPos);
@@ -2412,16 +3107,13 @@ export function createTyporaEditor(options) {
         nextState = nextState.apply(tr);
       }
       view.updateState(nextState);
-      updateStats(nextState);
-
-      if (transaction.docChanged && changeCallback) {
-        changeCallback(serializeMarkdown(), { source: "input" });
-      }
+      scheduleEditorSync({ docChanged: transaction.docChanged, source: "input" });
     },
   });
 
+  primeRootComputedStyle(view.dom);
   setPersistentStatus(persistentStatus);
-  updateStats(view.state);
+  flushEditorSyncNow();
 
   prismReady.then(() => {
     for (const codeBlock of codeBlockViews) {
@@ -2440,6 +3132,10 @@ export function createTyporaEditor(options) {
       view.focus();
     },
     destroy() {
+      flushEditorSyncNow({
+        docChanged: Boolean(pendingChangeSource),
+        source: pendingChangeSource || "input",
+      });
       window.clearTimeout(statusTimer);
       view?.destroy();
       view = null;
@@ -2448,6 +3144,13 @@ export function createTyporaEditor(options) {
       toolbarCallback = null;
       changeCallback = null;
       readyCallback = null;
+      syncQueued = false;
+      pendingChangeSource = null;
+      syncFrame = 0;
+      lastStatsLabel = "";
+      lastToolbarSignature = "";
+      cachedRootStyleTarget = null;
+      cachedRootStyle = null;
     },
     getMarkdown() {
       return serializeMarkdown();
@@ -2468,5 +3171,11 @@ export function createTyporaEditor(options) {
     downloadMarkdown,
     insertImage,
     flashStatus,
+    flushPendingSync() {
+      flushEditorSyncNow({
+        docChanged: Boolean(pendingChangeSource),
+        source: pendingChangeSource || "input",
+      });
+    },
   };
 }
