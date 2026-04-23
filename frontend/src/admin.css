@@ -5,12 +5,17 @@
 
 .admin-shell {
   min-height: 100vh;
+  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
+  overflow: hidden;
 }
 
 .admin-sider {
   width: 224px;
   flex-shrink: 0;
+  min-height: 0;
   background: #001529;
   color: rgba(255, 255, 255, 0.82);
   display: flex;
@@ -58,7 +63,8 @@
 
 .admin-sider .admin-menu-wrap {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
   padding: 8px 0;
 }
 
@@ -89,6 +95,8 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .admin-topbar {
@@ -112,8 +120,15 @@
 
 .admin-main {
   flex: 1;
+  min-height: 0;
   padding: 16px 20px 32px;
   overflow-y: auto;
+}
+
+.admin-main-editor {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .admin-loading {
@@ -263,17 +278,20 @@
 
 .editor-page {
   gap: 20px;
+  min-height: 0;
 }
 
 .editor-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 18px;
-  align-items: start;
+  align-items: stretch;
+  min-height: 0;
 }
 
 .editor-main {
   min-width: 0;
+  min-height: 0;
 }
 
 .editor-stage {
@@ -284,12 +302,39 @@
     radial-gradient(circle at top right, rgba(22, 93, 255, 0.04), transparent 28%),
     linear-gradient(180deg, #fff 0%, #f7f9fc 100%);
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+  min-height: 0;
+}
+
+.editor-stage-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  margin-bottom: 12px;
+  transition: margin-bottom 180ms ease;
+}
+
+.editor-stage-top.is-collapsed {
+  margin-bottom: 8px;
 }
 
 .editor-stage-hero {
   display: grid;
   gap: 12px;
-  margin-bottom: 18px;
+  transition:
+    gap 180ms ease,
+    opacity 180ms ease;
+}
+
+.editor-stage-top.is-collapsed .editor-stage-hero {
+  gap: 8px;
+}
+
+.editor-stage-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 .editor-stage-kicker {
@@ -326,6 +371,17 @@
   background: rgba(255, 255, 255, 0.78);
 }
 
+.editor-stage-top.is-collapsed .editor-summary-input {
+  display: none;
+}
+
+.editor-stage-top.is-collapsed .editor-title-input .arco-input-wrapper,
+.editor-stage-top.is-collapsed .editor-title-input .arco-input {
+  font-size: 22px !important;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
 .editor-stage-meta {
   display: flex;
   flex-wrap: wrap;
@@ -349,6 +405,57 @@
   gap: 12px;
   position: sticky;
   top: 64px;
+}
+
+@media (min-width: 1181px) {
+  .admin-main-editor {
+    padding-bottom: 16px;
+  }
+
+  .editor-page {
+    flex: 1;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .editor-page > .arco-spin,
+  .editor-page > .arco-spin > .arco-spin-children {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .editor-shell {
+    flex: 1;
+    height: 100%;
+  }
+
+  .editor-main,
+  .editor-stage,
+  .editor-sidebar {
+    height: 100%;
+  }
+
+  .editor-main {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .editor-stage {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .editor-stage-top {
+    flex-shrink: 0;
+  }
+
+  .editor-sidebar {
+    overflow: hidden;
+  }
 }
 
 /* taxonomy 双栏 */
@@ -449,19 +556,40 @@
 
 /* 响应式 */
 @media (max-width: 1180px) {
+  .admin-shell {
+    height: auto;
+    overflow: visible;
+  }
+
+  .admin-sider,
+  .admin-body {
+    overflow: visible;
+  }
+
+  .admin-main-editor {
+    overflow-y: auto;
+  }
+
   .stat-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .editor-layout,
   .editor-shell,
-  .taxonomy-grid {
+  .taxonomy-grid,
+  .editor-stage-top {
     grid-template-columns: 1fr;
   }
 
   .editor-aside,
   .editor-sidebar {
     position: static;
+    height: auto;
+    overflow: visible;
+  }
+
+  .editor-stage-actions {
+    justify-content: flex-start;
   }
 }
 

@@ -880,13 +880,20 @@ textarea {
   background: rgba(207, 34, 46, 0.08) !important;
 }
 
-.prose p code,
-.prose li code {
+.prose :where(p, li, td, th, blockquote) code {
   padding: 1px 6px;
   border-radius: 4px;
   background: var(--primary-soft);
   color: var(--primary);
   font-size: 0.9em;
+}
+
+.prose s,
+.prose del {
+  color: var(--text-soft);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: currentColor;
 }
 
 .prose blockquote {
@@ -917,6 +924,22 @@ textarea {
   padding: 8px 12px;
   border-bottom: 1px solid var(--line);
   text-align: left;
+}
+
+.prose th[align="center"],
+.prose td[align="center"] {
+  text-align: center;
+}
+
+.prose th[align="right"],
+.prose td[align="right"] {
+  text-align: right;
+}
+
+.prose li input[type="checkbox"] {
+  margin-right: 8px;
+  accent-color: var(--primary);
+  vertical-align: text-bottom;
 }
 
 .prose tr:last-child td {

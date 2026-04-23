@@ -25,8 +25,10 @@ const form = reactive({
 const taxonomies = ref<TaxonomyBundle>({ categories: [], tags: [] });
 const saving = ref(false);
 const loading = ref(false);
+const editorScrollTop = ref(0);
 
 const isEdit = computed(() => route.params.id !== undefined);
+const heroCollapsed = computed(() => editorScrollTop.value > 24);
 
 async function loadTaxonomies() {
   taxonomies.value = await apiFetch<TaxonomyBundle>(
@@ -92,6 +94,10 @@ function addTagFromPool(name: string) {
   }
 }
 
+function handleEditorScroll(scrollTop: number) {
+  editorScrollTop.value = scrollTop;
+}
+
 onMounted(async () => {
   await loadTaxonomies();
   await loadPost();
@@ -100,49 +106,41 @@ onMounted(async () => {
 
 <template>
   <section class="page-stack editor-page">
-    <header class="page-header">
-      <div>
-        <h1>{{ isEdit ? "编辑文章" : "创建文章" }}</h1>
-        <div class="page-sub">
-          结构化所见所得编辑，保留 Markdown 导出与博客页接近的正文样式
-        </div>
-      </div>
-      <a-space :size="8">
-        <a-button @click="router.back()">返回</a-button>
-        <a-button type="primary" :loading="saving" @click="save">
-          <template #icon><icon-save /></template>
-          保存
-        </a-button>
-      </a-space>
-    </header>
-
     <a-spin :loading="loading" style="display: block">
       <div class="editor-shell">
         <section class="editor-main">
           <div class="editor-stage">
-            <div class="editor-stage-hero">
-              <span class="editor-stage-kicker">Single Surface Editor</span>
-              <a-input
-                v-model="form.title"
-                class="editor-title-input"
-                size="large"
-                placeholder="例如：构建高性能技术博客的渲染链路"
-                allow-clear
-              />
-              <a-textarea
-                v-model="form.summary"
-                class="editor-summary-input"
-                :auto-size="{ minRows: 2, maxRows: 4 }"
-                placeholder="文章摘要会用于首页卡片、搜索结果和分享海报"
-              />
-              <div class="editor-stage-meta">
-                <span>访问 ID：{{ form.slug || "保存后自动生成" }}</span>
-                <span>当前分类：{{ form.category_name || "未设置" }}</span>
-                <span>标签数：{{ form.tags.length }}</span>
+            <div class="editor-stage-top" :class="{ 'is-collapsed': heroCollapsed }">
+              <div class="editor-stage-hero">
+                <a-input
+                  v-model="form.title"
+                  class="editor-title-input"
+                  size="large"
+                  placeholder="例如：构建高性能技术博客的渲染链路"
+                  allow-clear
+                />
+                <a-textarea
+                  v-model="form.summary"
+                  class="editor-summary-input"
+                  :auto-size="{ minRows: 2, maxRows: 4 }"
+                  placeholder="文章摘要会用于首页卡片、搜索结果和分享海报"
+                />
               </div>
+
+              <a-space class="editor-stage-actions" :size="8">
+                <a-button @click="router.back()">返回</a-button>
+                <a-button type="primary" :loading="saving" @click="save">
+                  <template #icon><icon-save /></template>
+                  保存
+                </a-button>
+              </a-space>
             </div>
 
-            <MarkdownEditor v-model="form.markdown" :token="auth.token" />
+            <MarkdownEditor
+              v-model="form.markdown"
+              :token="auth.token"
+              @editor-scroll="handleEditorScroll"
+            />
           </div>
         </section>
 

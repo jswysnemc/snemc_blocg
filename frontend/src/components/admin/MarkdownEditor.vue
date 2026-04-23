@@ -21,6 +21,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: "update:modelValue", value: string): void;
+  (event: "editor-scroll", scrollTop: number): void;
 }>();
 
 const editorHost = ref<HTMLDivElement | null>(null);
@@ -34,11 +35,13 @@ let lastMarkdown = props.modelValue;
 let pasteHandler: ((event: ClipboardEvent) => void) | null = null;
 let dragOverHandler: ((event: DragEvent) => void) | null = null;
 let dropHandler: ((event: DragEvent) => void) | null = null;
+let scrollHandler: (() => void) | null = null;
 
 const commandGroups = [
   [
     { key: "bold", label: "加粗" },
     { key: "italic", label: "斜体" },
+    { key: "strike", label: "删除线" },
     { key: "inlineCode", label: "行内代码" },
   ],
   [
@@ -49,6 +52,8 @@ const commandGroups = [
     { key: "orderedList", label: "有序列表" },
     { key: "table", label: "表格" },
     { key: "codeBlock", label: "代码块" },
+    { key: "mathBlock", label: "公式" },
+    { key: "mermaidBlock", label: "Mermaid" },
   ],
 ];
 
@@ -224,9 +229,15 @@ onMounted(() => {
     void insertImageFile(file);
   };
 
+  scrollHandler = () => {
+    emit("editor-scroll", editorHost.value?.scrollTop ?? 0);
+  };
+
   editorHost.value.addEventListener("paste", pasteHandler);
   editorHost.value.addEventListener("dragover", dragOverHandler);
   editorHost.value.addEventListener("drop", dropHandler);
+  editorHost.value.addEventListener("scroll", scrollHandler, { passive: true });
+  scrollHandler();
 });
 
 watch(
@@ -245,6 +256,9 @@ onBeforeUnmount(() => {
     editorHost.value.removeEventListener("paste", pasteHandler);
     editorHost.value.removeEventListener("dragover", dragOverHandler);
     editorHost.value.removeEventListener("drop", dropHandler);
+  }
+  if (editorHost.value && scrollHandler) {
+    editorHost.value.removeEventListener("scroll", scrollHandler);
   }
   editor?.destroy();
 });

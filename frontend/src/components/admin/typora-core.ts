@@ -2,25 +2,56 @@
 
 import "./typora-editor.css";
 
+import katex from "katex";
+import "katex/dist/katex.min.css";
 import markdownIt from "markdown-it";
+import mermaid from "mermaid";
 import Prism from "prismjs";
-import "prismjs/components/prism-bash";
-import "prismjs/components/prism-css";
-import "prismjs/components/prism-java";
-import "prismjs/components/prism-javascript";
-import "prismjs/components/prism-json";
-import "prismjs/components/prism-jsx";
-import "prismjs/components/prism-markdown";
-import "prismjs/components/prism-markup";
-import "prismjs/components/prism-python";
-import "prismjs/components/prism-sql";
-import "prismjs/components/prism-tsx";
-import "prismjs/components/prism-typescript";
-import "prismjs/components/prism-yaml";
-import "prismjs/components/prism-go";
+
+if (typeof window !== "undefined") {
+  window.Prism = Prism;
+}
+
+const prismLanguageModules = [
+  "prismjs/components/prism-markup",
+  "prismjs/components/prism-clike",
+  "prismjs/components/prism-javascript",
+  "prismjs/components/prism-jsx",
+  "prismjs/components/prism-typescript",
+  "prismjs/components/prism-tsx",
+  "prismjs/components/prism-bash",
+  "prismjs/components/prism-c",
+  "prismjs/components/prism-cpp",
+  "prismjs/components/prism-css",
+  "prismjs/components/prism-java",
+  "prismjs/components/prism-json",
+  "prismjs/components/prism-lua",
+  "prismjs/components/prism-markdown",
+  "prismjs/components/prism-python",
+  "prismjs/components/prism-rust",
+  "prismjs/components/prism-sql",
+  "prismjs/components/prism-yaml",
+  "prismjs/components/prism-go",
+];
+
+async function loadPrismModule(moduleId) {
+  try {
+    await import(moduleId);
+  } catch (error) {
+    console.error(`[typora] Prism language load failed: ${moduleId}`, error);
+  }
+}
+
+const prismReady = (async () => {
+  for (const moduleId of prismLanguageModules) {
+    await loadPrismModule(moduleId);
+  }
+})();
+
+const codeBlockViews = new Set();
 import { baseKeymap, chainCommands, createParagraphNear, exitCode, liftEmptyBlock, setBlockType, splitBlock, toggleMark, wrapIn } from "prosemirror-commands";
 import { undo, redo, history } from "prosemirror-history";
-import { inputRules, textblockTypeInputRule, wrappingInputRule } from "prosemirror-inputrules";
+import { InputRule, inputRules, textblockTypeInputRule, wrappingInputRule } from "prosemirror-inputrules";
 import { keymap } from "prosemirror-keymap";
 import { Schema } from "prosemirror-model";
 import { MarkdownParser, MarkdownSerializer, defaultMarkdownParser, defaultMarkdownSerializer, schema as baseMarkdownSchema } from "prosemirror-markdown";
@@ -85,35 +116,127 @@ export function renderEditor(mode: "wysiwyg" | "raw") {
 | 这个 demo | 否 | 更接近 Typora |
 | 代码块编辑 | 单区域 | 实时高亮 |`;
 
-const editorSchema = new Schema({
-  nodes: baseMarkdownSchema.spec.nodes.append(
-    tableNodes({
-      tableGroup: "block",
-      cellContent: "paragraph+",
-      cellAttributes: {
-        align: {
-          default: null,
-          getFromDOM(dom) {
-            return dom.getAttribute("data-align") || dom.style.textAlign || null;
-          },
-          setDOMAttr(value, attrs) {
-            if (!value) {
-              return;
-            }
+const strikeMarkSpec = {
+  parseDOM: [{ tag: "s" }, { tag: "del" }],
+  toDOM() {
+    return ["del", 0];
+  },
+};
 
-            attrs["data-align"] = value;
-            attrs.style = attrs.style ? `${attrs.style};text-align:${value}` : `text-align:${value}`;
+const mathInlineSpec = {
+  inline: true,
+  group: "inline",
+  atom: true,
+  selectable: true,
+  attrs: {
+    formula: { default: "" },
+  },
+  parseDOM: [{
+    tag: "span[data-math-inline]",
+    getAttrs(dom) {
+      return {
+        formula: dom.getAttribute("data-formula") || dom.textContent || "",
+      };
+    },
+  }],
+  toDOM(node) {
+    return [
+      "span",
+      {
+        class: "pm-inline-math",
+        "data-math-inline": "true",
+        "data-formula": node.attrs.formula || "",
+      },
+      `$${node.attrs.formula || ""}$`,
+    ];
+  },
+};
+
+function inlineMathRule(state, silent) {
+  const start = state.pos;
+  if (state.src.charCodeAt(start) !== 0x24) {
+    return false;
+  }
+  if (start > 0 && state.src.charCodeAt(start - 1) === 0x5c) {
+    return false;
+  }
+  if (start + 1 >= state.posMax || state.src.charCodeAt(start + 1) === 0x24) {
+    return false;
+  }
+
+  let cursor = start + 1;
+  while (cursor < state.posMax) {
+    const next = state.src.indexOf("$", cursor);
+    if (next === -1) {
+      return false;
+    }
+    if (state.src.charCodeAt(next - 1) === 0x5c) {
+      cursor = next + 1;
+      continue;
+    }
+
+    const formula = state.src.slice(start + 1, next);
+    if (!formula.trim() || formula.includes("\n")) {
+      cursor = next + 1;
+      continue;
+    }
+
+    if (!silent) {
+      const token = state.push("math_inline", "math", 0);
+      token.content = formula;
+      token.markup = "$";
+    }
+    state.pos = next + 1;
+    return true;
+  }
+
+  return false;
+}
+
+function inlineMathPlugin(md) {
+  md.inline.ruler.after("escape", "math_inline", inlineMathRule);
+}
+
+const editorSchema = new Schema({
+  nodes: baseMarkdownSchema.spec.nodes
+    .append(
+      tableNodes({
+        tableGroup: "block",
+        cellContent: "paragraph+",
+        cellAttributes: {
+          align: {
+            default: null,
+            getFromDOM(dom) {
+              return dom.getAttribute("data-align") || dom.style.textAlign || null;
+            },
+            setDOMAttr(value, attrs) {
+              if (!value) {
+                return;
+              }
+
+              attrs["data-align"] = value;
+              attrs.style = attrs.style ? `${attrs.style};text-align:${value}` : `text-align:${value}`;
+            },
           },
         },
-      },
-    }),
-  ),
-  marks: baseMarkdownSchema.spec.marks,
+      }),
+    )
+    .addToEnd("math_inline", mathInlineSpec),
+  marks: baseMarkdownSchema.spec.marks.addToEnd("strike", strikeMarkSpec),
 });
 
-const markdownTokenizer = markdownIt("commonmark", { html: false, linkify: true }).enable("table");
+const markdownTokenizer = markdownIt("commonmark", { html: false, linkify: true })
+  .use(inlineMathPlugin)
+  .enable(["table", "strikethrough"]);
 const markdownParser = new MarkdownParser(editorSchema, markdownTokenizer, {
   ...defaultMarkdownParser.tokens,
+  math_inline: {
+    node: "math_inline",
+    getAttrs(token) {
+      return { formula: token.content || "" };
+    },
+  },
+  s: { mark: "strike" },
   table: { block: "table" },
   thead: { ignore: true },
   tbody: { ignore: true },
@@ -145,16 +268,65 @@ markdownParser.tokenHandlers.td_close = (state) => {
 const markdownSerializer = new MarkdownSerializer(
   {
     ...defaultMarkdownSerializer.nodes,
+    code_block(state, node) {
+      const params = (node.attrs.params || "").trim().toLowerCase();
+      if (params === "math") {
+        const content = node.textContent;
+        state.write("$$\n");
+        state.text(content, false);
+        state.write("\n$$");
+        state.closeBlock(node);
+        return;
+      }
+      defaultMarkdownSerializer.nodes.code_block(state, node);
+    },
+    math_inline(state, node) {
+      state.text(`$${node.attrs.formula || ""}$`, false);
+    },
     table(state, node) {
       renderMarkdownTable(state, node);
     },
   },
-  defaultMarkdownSerializer.marks,
+  {
+    ...defaultMarkdownSerializer.marks,
+    strike: {
+      open: "~~",
+      close: "~~",
+      mixable: true,
+      expelEnclosingWhitespace: true,
+    },
+  },
 );
+
+function insertSpecialBlock(params) {
+  return (state, dispatch) => {
+    const { $from } = state.selection;
+    const topLevelNode = $from.node(1);
+    const replaceEmptyParagraph =
+      topLevelNode.type === editorSchema.nodes.paragraph &&
+      topLevelNode.childCount === 0;
+    const insertPos = replaceEmptyParagraph ? $from.before(1) : $from.after(1);
+    const codeBlock = editorSchema.nodes.code_block.create({ params });
+
+    let transaction = state.tr;
+    if (replaceEmptyParagraph) {
+      transaction = transaction.replaceWith(insertPos, insertPos + topLevelNode.nodeSize, codeBlock);
+    } else {
+      transaction = transaction.insert(insertPos, codeBlock);
+    }
+
+    transaction = transaction
+      .setSelection(TextSelection.create(transaction.doc, insertPos + 1))
+      .scrollIntoView();
+    if (dispatch) dispatch(transaction);
+    return true;
+  };
+}
 
 const COMMANDS = {
   bold: toggleMark(editorSchema.marks.strong),
   italic: toggleMark(editorSchema.marks.em),
+  strike: toggleMark(editorSchema.marks.strike),
   inlineCode: toggleMark(editorSchema.marks.code),
   h1: toggleTextBlock(editorSchema.nodes.heading, { level: 1 }),
   h2: toggleTextBlock(editorSchema.nodes.heading, { level: 2 }),
@@ -163,6 +335,8 @@ const COMMANDS = {
   orderedList: wrapInList(editorSchema.nodes.ordered_list),
   table: insertTable(),
   codeBlock: toggleCodeBlock(),
+  mathBlock: insertSpecialBlock("math"),
+  mermaidBlock: insertSpecialBlock("mermaid"),
 };
 
 const TABLE_COMMANDS = {
@@ -183,6 +357,10 @@ const LANGUAGE_ALIASES = {
   vue: "markup",
   js: "javascript",
   ts: "typescript",
+  c: "c",
+  "c++": "cpp",
+  cpp: "cpp",
+  cc: "cpp",
   sh: "bash",
   shell: "bash",
   yml: "yaml",
@@ -253,6 +431,11 @@ class CodeBlockView {
     this.textarea.spellcheck = false;
     this.textarea.setAttribute("aria-label", "代码块编辑区域");
 
+    const detected = detectTabSize(node.textContent);
+    this.tabSize = detected.size;
+    this.indentChar = detected.char;
+    this.applyTabSize();
+
     this.surface.append(this.highlight, this.textarea);
     this.dom.append(this.header, this.surface);
 
@@ -281,10 +464,22 @@ class CodeBlockView {
 
     this.renderHighlight();
     this.adjustHeight();
+
+    codeBlockViews.add(this);
+
+    requestAnimationFrame(() => {
+      this.adjustHeight();
+      this.renderHighlight();
+    });
   }
 
   update(node) {
     if (node.type !== this.node.type) {
+      return false;
+    }
+
+    const nextParams = (node.attrs.params || "").trim().toLowerCase();
+    if (nextParams === "math" || nextParams === "mermaid") {
       return false;
     }
 
@@ -321,6 +516,79 @@ class CodeBlockView {
 
   ignoreMutation() {
     return true;
+  }
+
+  destroy() {
+    codeBlockViews.delete(this);
+  }
+
+  getSelectedLineRange() {
+    const value = this.textarea.value;
+    let { selectionStart, selectionEnd } = this.textarea;
+
+    let lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
+    let lineEnd = value.indexOf("\n", selectionEnd);
+    if (lineEnd === -1) lineEnd = value.length;
+
+    return { lineStart, lineEnd };
+  }
+
+  indentLines() {
+    const value = this.textarea.value;
+    const { selectionStart, selectionEnd } = this.textarea;
+    const { lineStart, lineEnd } = this.getSelectedLineRange();
+
+    const lines = value.substring(lineStart, lineEnd).split("\n");
+    const indented = lines.map((line) => this.indentChar + line).join("\n");
+
+    this.textarea.value = value.substring(0, lineStart) + indented + value.substring(lineEnd);
+
+    const cursorOffset = this.indentChar.length;
+    this.textarea.selectionStart = selectionStart + cursorOffset;
+    this.textarea.selectionEnd = selectionEnd + cursorOffset * lines.length;
+  }
+
+  outdentLines() {
+    const value = this.textarea.value;
+    let { selectionStart, selectionEnd } = this.textarea;
+    const { lineStart, lineEnd } = this.getSelectedLineRange();
+
+    const lines = value.substring(lineStart, lineEnd).split("\n");
+    let totalRemoved = 0;
+
+    const outdented = lines.map((line) => {
+      if (line.startsWith("\t")) {
+        totalRemoved += 1;
+        return line.substring(1);
+      }
+      const spaces = line.match(/^ +/);
+      if (spaces) {
+        const cut = Math.min(spaces[0].length, this.tabSize);
+        totalRemoved += cut;
+        return line.substring(cut);
+      }
+      return line;
+    }).join("\n");
+
+    this.textarea.value = value.substring(0, lineStart) + outdented + value.substring(lineEnd);
+
+    const anchorShift = Math.min(totalRemoved > 0 ? this.indentChar.length : 0, selectionStart - lineStart);
+    this.textarea.selectionStart = Math.max(lineStart, selectionStart - anchorShift);
+    this.textarea.selectionEnd = Math.max(this.textarea.selectionStart, selectionEnd - totalRemoved);
+  }
+
+  applyTabSize() {
+    this.highlight.style.tabSize = String(this.tabSize);
+    this.textarea.style.tabSize = String(this.tabSize);
+  }
+
+  refreshTabSize() {
+    const detected = detectTabSize(this.textarea.value);
+    if (detected.size !== this.tabSize || detected.char !== this.indentChar) {
+      this.tabSize = detected.size;
+      this.indentChar = detected.char;
+      this.applyTabSize();
+    }
   }
 
   updateParams() {
@@ -404,10 +672,25 @@ class CodeBlockView {
   }
 
   handleKeydown(event) {
+    if ((event.key === "Backspace" || event.key === "Delete") && this.textarea.value.length === 0) {
+      event.preventDefault();
+      const pos = this.getPos();
+      const nodeSize = this.node.nodeSize;
+      const paragraph = this.view.state.schema.nodes.paragraph.create();
+      let tr = this.view.state.tr.replaceWith(pos, pos + nodeSize, paragraph);
+      tr = tr.setSelection(TextSelection.create(tr.doc, pos + 1)).scrollIntoView();
+      this.view.dispatch(tr);
+      this.view.focus();
+      return;
+    }
+
     if (event.key === "Tab") {
       event.preventDefault();
-      const { selectionStart, selectionEnd } = this.textarea;
-      this.textarea.setRangeText("  ", selectionStart, selectionEnd, "end");
+      if (event.shiftKey) {
+        this.outdentLines();
+      } else {
+        this.indentLines();
+      }
       this.renderHighlight();
       this.adjustHeight();
       this.forwardText();
@@ -497,7 +780,10 @@ class CodeBlockView {
 
   adjustHeight() {
     this.textarea.style.height = "0px";
-    const height = Math.max(this.textarea.scrollHeight, 152);
+    const contentHeight = this.textarea.scrollHeight;
+    const lineHeight = parseFloat(getComputedStyle(this.textarea).lineHeight) || 26;
+    const minPadding = 36;
+    const height = Math.max(contentHeight, minPadding + lineHeight);
     this.surface.style.height = `${height}px`;
     this.textarea.style.height = `${height}px`;
   }
@@ -526,6 +812,407 @@ class CodeBlockView {
     this.code.innerHTML =
       renderHighlightedCode(content, Prism.languages[language], selectionStart, selectionEnd) ||
       "<span class=\"token plain\"> </span>";
+
+    this.refreshTabSize();
+  }
+}
+
+class InlineMathView {
+  constructor(node, editorView, getPos) {
+    this.node = node;
+    this.view = editorView;
+    this.getPos = getPos;
+
+    this.dom = document.createElement("span");
+    this.dom.className = "pm-inline-math";
+    this.dom.setAttribute("data-math-inline", "true");
+    this.dom.contentEditable = "false";
+
+    this.dom.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.replaceWithSource();
+    });
+
+    this.render();
+  }
+
+  update(node) {
+    if (node.type !== this.node.type) {
+      return false;
+    }
+    this.node = node;
+    this.render();
+    return true;
+  }
+
+  render() {
+    const formula = this.node.attrs.formula || "";
+    this.dom.dataset.formula = formula;
+    this.dom.title = formula;
+    this.dom.classList.remove("is-error", "is-empty");
+
+    if (!formula.trim()) {
+      this.dom.textContent = "$?$";
+      this.dom.classList.add("is-empty");
+      return;
+    }
+
+    try {
+      this.dom.innerHTML = katex.renderToString(formula, {
+        displayMode: false,
+        throwOnError: false,
+      });
+    } catch {
+      this.dom.textContent = `$${formula}$`;
+      this.dom.classList.add("is-error");
+    }
+  }
+
+  replaceWithSource() {
+    const pos = this.getPos();
+    if (typeof pos !== "number") {
+      return;
+    }
+
+    const source = `$${this.node.attrs.formula || ""}$`;
+    let tr = this.view.state.tr.replaceWith(pos, pos + this.node.nodeSize, this.view.state.schema.text(source));
+    tr = tr.setSelection(TextSelection.create(tr.doc, Math.max(pos + 1, pos + source.length - 1))).scrollIntoView();
+    this.view.dispatch(tr);
+    this.view.focus();
+  }
+
+  selectNode() {
+    this.dom.classList.add("ProseMirror-selectednode");
+  }
+
+  deselectNode() {
+    this.dom.classList.remove("ProseMirror-selectednode");
+  }
+
+  stopEvent(event) {
+    return event.type === "dblclick";
+  }
+
+  ignoreMutation() {
+    return true;
+  }
+}
+
+let mermaidCounter = 0;
+
+class MathBlockView {
+  constructor(node, editorView, getPos) {
+    this.node = node;
+    this.view = editorView;
+    this.getPos = getPos;
+    this.updating = false;
+    this.sourceMode = false;
+
+    this.dom = document.createElement("section");
+    this.dom.className = "pm-math-block";
+    this.dom.dataset.mode = "render";
+
+    this.header = document.createElement("div");
+    this.header.className = "math-block-header";
+
+    this.label = document.createElement("span");
+    this.label.className = "math-block-label";
+    this.label.textContent = "Formula";
+
+    this.toggleBtn = document.createElement("button");
+    this.toggleBtn.type = "button";
+    this.toggleBtn.className = "math-block-toggle";
+    this.toggleBtn.textContent = "源码";
+
+    this.header.append(this.label, this.toggleBtn);
+
+    this.renderContainer = document.createElement("div");
+    this.renderContainer.className = "math-render";
+
+    this.sourceContainer = document.createElement("div");
+    this.sourceContainer.className = "math-source";
+
+    this.textarea = document.createElement("textarea");
+    this.textarea.className = "math-editor";
+    this.textarea.value = node.textContent;
+    this.textarea.spellcheck = false;
+    this.textarea.setAttribute("aria-label", "公式编辑区域");
+
+    this.sourceContainer.append(this.textarea);
+    this.dom.append(this.header, this.renderContainer, this.sourceContainer);
+
+    this.toggleBtn.addEventListener("click", () => {
+      this.sourceMode = !this.sourceMode;
+      this.dom.dataset.mode = this.sourceMode ? "source" : "render";
+      this.toggleBtn.textContent = this.sourceMode ? "预览" : "源码";
+      if (!this.sourceMode) {
+        this.renderMath();
+      }
+    });
+
+    this.textarea.addEventListener("input", () => {
+      this.renderMath();
+      this.forwardText();
+    });
+
+    this.textarea.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        this.sourceMode = false;
+        this.dom.dataset.mode = "render";
+        this.toggleBtn.textContent = "源码";
+        this.renderMath();
+        this.view.focus();
+      }
+      if ((event.key === "Backspace" || event.key === "Delete") && this.textarea.value.length === 0) {
+        event.preventDefault();
+        this.deleteSelf();
+      }
+    });
+
+    this.renderMath();
+  }
+
+  update(node) {
+    if (node.type !== this.node.type) return false;
+    const nextParams = (node.attrs.params || "").trim().toLowerCase();
+    if (nextParams !== "math") return false;
+    this.node = node;
+    if (!this.updating && this.textarea.value !== node.textContent) {
+      this.textarea.value = node.textContent;
+    }
+    this.renderMath();
+    return true;
+  }
+
+  selectNode() {
+    if (this.sourceMode) {
+      this.textarea.focus();
+    }
+  }
+
+  stopEvent() { return true; }
+  ignoreMutation() { return true; }
+
+  renderMath() {
+    const content = this.textarea.value.trim();
+    if (!content) {
+      this.renderContainer.innerHTML = '<span class="math-placeholder">输入 LaTeX 公式</span>';
+      return;
+    }
+    try {
+      this.renderContainer.innerHTML = katex.renderToString(content, {
+        displayMode: true,
+        throwOnError: false,
+      });
+    } catch {
+      this.renderContainer.innerHTML = '<span class="math-error">公式语法错误</span>';
+    }
+  }
+
+  forwardText() {
+    if (this.updating) return;
+    const previous = this.node.textContent;
+    const next = this.textarea.value;
+    const offset = this.getPos() + 1;
+    const { selectionStart, selectionEnd } = this.textarea;
+
+    let start = 0;
+    let previousEnd = previous.length;
+    let nextEnd = next.length;
+    while (start < previousEnd && start < nextEnd && previous.charCodeAt(start) === next.charCodeAt(start)) start += 1;
+    while (previousEnd > start && nextEnd > start && previous.charCodeAt(previousEnd - 1) === next.charCodeAt(nextEnd - 1)) {
+      previousEnd -= 1;
+      nextEnd -= 1;
+    }
+
+    let transaction = this.view.state.tr;
+    if (previousEnd > start || nextEnd > start) {
+      if (nextEnd > start) {
+        transaction = transaction.replaceWith(offset + start, offset + previousEnd, this.view.state.schema.text(next.slice(start, nextEnd)));
+      } else {
+        transaction = transaction.delete(offset + start, offset + previousEnd);
+      }
+    }
+    transaction = transaction.setSelection(TextSelection.create(transaction.doc, offset + selectionStart, offset + selectionEnd));
+    this.view.dispatch(transaction);
+  }
+
+  setSelection(anchor, head) {
+    this.updating = true;
+    this.textarea.focus();
+    this.textarea.setSelectionRange(anchor, head);
+    this.updating = false;
+  }
+
+  deleteSelf() {
+    const pos = this.getPos();
+    if (typeof pos !== "number") return;
+    const nodeSize = this.node.nodeSize;
+    const paragraph = this.view.state.schema.nodes.paragraph.create();
+    let tr = this.view.state.tr.replaceWith(pos, pos + nodeSize, paragraph);
+    tr = tr.setSelection(TextSelection.create(tr.doc, pos + 1)).scrollIntoView();
+    this.view.dispatch(tr);
+    this.view.focus();
+  }
+}
+
+class MermaidBlockView {
+  constructor(node, editorView, getPos) {
+    this.node = node;
+    this.view = editorView;
+    this.getPos = getPos;
+    this.updating = false;
+    this.sourceMode = false;
+    this.renderId = `mermaid-${++mermaidCounter}`;
+
+    this.dom = document.createElement("section");
+    this.dom.className = "pm-mermaid-block";
+    this.dom.dataset.mode = "render";
+
+    this.header = document.createElement("div");
+    this.header.className = "mermaid-block-header";
+
+    this.label = document.createElement("span");
+    this.label.className = "mermaid-block-label";
+    this.label.textContent = "Mermaid";
+
+    this.toggleBtn = document.createElement("button");
+    this.toggleBtn.type = "button";
+    this.toggleBtn.className = "mermaid-block-toggle";
+    this.toggleBtn.textContent = "源码";
+
+    this.header.append(this.label, this.toggleBtn);
+
+    this.renderContainer = document.createElement("div");
+    this.renderContainer.className = "mermaid-render";
+
+    this.sourceContainer = document.createElement("div");
+    this.sourceContainer.className = "mermaid-source";
+
+    this.textarea = document.createElement("textarea");
+    this.textarea.className = "mermaid-editor";
+    this.textarea.value = node.textContent;
+    this.textarea.spellcheck = false;
+    this.textarea.setAttribute("aria-label", "Mermaid 编辑区域");
+
+    this.sourceContainer.append(this.textarea);
+    this.dom.append(this.header, this.renderContainer, this.sourceContainer);
+
+    this.toggleBtn.addEventListener("click", () => {
+      this.sourceMode = !this.sourceMode;
+      this.dom.dataset.mode = this.sourceMode ? "source" : "render";
+      this.toggleBtn.textContent = this.sourceMode ? "预览" : "源码";
+      if (!this.sourceMode) {
+        this.renderMermaid();
+      }
+    });
+
+    this.textarea.addEventListener("input", () => {
+      this.forwardText();
+    });
+
+    this.textarea.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        this.sourceMode = false;
+        this.dom.dataset.mode = "render";
+        this.toggleBtn.textContent = "源码";
+        this.renderMermaid();
+        this.view.focus();
+      }
+      if ((event.key === "Backspace" || event.key === "Delete") && this.textarea.value.length === 0) {
+        event.preventDefault();
+        this.deleteSelf();
+      }
+    });
+
+    this.renderMermaid();
+  }
+
+  update(node) {
+    if (node.type !== this.node.type) return false;
+    const nextParams = (node.attrs.params || "").trim().toLowerCase();
+    if (nextParams !== "mermaid") return false;
+    this.node = node;
+    if (!this.updating && this.textarea.value !== node.textContent) {
+      this.textarea.value = node.textContent;
+    }
+    if (!this.sourceMode) {
+      this.renderMermaid();
+    }
+    return true;
+  }
+
+  selectNode() {
+    if (this.sourceMode) {
+      this.textarea.focus();
+    }
+  }
+
+  stopEvent() { return true; }
+  ignoreMutation() { return true; }
+
+  async renderMermaid() {
+    const content = this.textarea.value.trim();
+    if (!content) {
+      this.renderContainer.innerHTML = '<span class="mermaid-placeholder">输入 Mermaid 图表定义</span>';
+      return;
+    }
+    try {
+      mermaid.initialize({ startOnLoad: false, theme: "neutral" });
+      const { svg } = await mermaid.render(this.renderId, content);
+      this.renderContainer.innerHTML = svg;
+    } catch {
+      this.renderContainer.innerHTML = '<span class="mermaid-error">Mermaid 语法错误</span>';
+    }
+  }
+
+  forwardText() {
+    if (this.updating) return;
+    const previous = this.node.textContent;
+    const next = this.textarea.value;
+    const offset = this.getPos() + 1;
+    const { selectionStart, selectionEnd } = this.textarea;
+
+    let start = 0;
+    let previousEnd = previous.length;
+    let nextEnd = next.length;
+    while (start < previousEnd && start < nextEnd && previous.charCodeAt(start) === next.charCodeAt(start)) start += 1;
+    while (previousEnd > start && nextEnd > start && previous.charCodeAt(previousEnd - 1) === next.charCodeAt(nextEnd - 1)) {
+      previousEnd -= 1;
+      nextEnd -= 1;
+    }
+
+    let transaction = this.view.state.tr;
+    if (previousEnd > start || nextEnd > start) {
+      if (nextEnd > start) {
+        transaction = transaction.replaceWith(offset + start, offset + previousEnd, this.view.state.schema.text(next.slice(start, nextEnd)));
+      } else {
+        transaction = transaction.delete(offset + start, offset + previousEnd);
+      }
+    }
+    transaction = transaction.setSelection(TextSelection.create(transaction.doc, offset + selectionStart, offset + selectionEnd));
+    this.view.dispatch(transaction);
+  }
+
+  setSelection(anchor, head) {
+    this.updating = true;
+    this.textarea.focus();
+    this.textarea.setSelectionRange(anchor, head);
+    this.updating = false;
+  }
+
+  deleteSelf() {
+    const pos = this.getPos();
+    if (typeof pos !== "number") return;
+    const nodeSize = this.node.nodeSize;
+    const paragraph = this.view.state.schema.nodes.paragraph.create();
+    let tr = this.view.state.tr.replaceWith(pos, pos + nodeSize, paragraph);
+    tr = tr.setSelection(TextSelection.create(tr.doc, pos + 1)).scrollIntoView();
+    this.view.dispatch(tr);
+    this.view.focus();
   }
 }
 
@@ -589,7 +1276,6 @@ class AdjustableTableView {
         return;
       }
 
-      event.preventDefault();
       this.isSelecting = true;
       this.previewRows = Number.parseInt(cell.dataset.rows, 10);
       this.previewColumns = Number.parseInt(cell.dataset.columns, 10);
@@ -649,6 +1335,18 @@ class AdjustableTableView {
   }
 
   update(node) {
+    if (node.type !== this.node.type) {
+      return false;
+    }
+
+    const rowChanged = node.childCount !== this.node.childCount;
+    const colChanged = node.firstChild && this.node.firstChild
+      && node.firstChild.childCount !== this.node.firstChild.childCount;
+
+    if (rowChanged || colChanged) {
+      return false;
+    }
+
     if (!this.innerView.update(node)) {
       return false;
     }
@@ -750,6 +1448,13 @@ class AdjustableTableView {
           this.applyResize(rowIndex, columnIndex);
         });
 
+        cell.addEventListener("click", () => {
+          this.previewRows = rowIndex;
+          this.previewColumns = columnIndex;
+          this.paintPicker();
+          this.applyResize(rowIndex, columnIndex);
+        });
+
         this.grid.append(cell);
       }
     }
@@ -777,6 +1482,11 @@ class AdjustableTableView {
     }
 
     const position = this.getPos();
+    if (typeof position !== "number") {
+      this.setOpen(false);
+      return;
+    }
+
     const nextTable = resizeTableNode(this.node, nextRows, nextColumns);
     let transaction = this.view.state.tr.replaceWith(position, position + this.node.nodeSize, nextTable);
     transaction = transaction
@@ -941,15 +1651,16 @@ function insertTable(rows = 3, columns = 3) {
 
 function serializeTableCell(node) {
   const fragmentDoc = editorSchema.nodes.doc.create(null, node.content);
-  const markdown = defaultMarkdownSerializer.serialize(fragmentDoc).trim();
+  const markdown = normalizeSerializedMarkdown(markdownSerializer.serialize(fragmentDoc).trim());
   const flattened = markdown.replace(/\n{2,}/g, "<br>").replace(/\n/g, "<br>");
 
-  return flattened.replace(/\|/g, "\\|");
+  return flattened.replace(/\|/g, "\\|").replace(/\\--/g, "--");
 }
 
 function getColumnAlignment(tableNode, columnIndex) {
   for (let rowIndex = 0; rowIndex < tableNode.childCount; rowIndex += 1) {
     const row = tableNode.child(rowIndex);
+    if (columnIndex >= row.childCount) continue;
     const cell = row.child(columnIndex);
 
     if (cell?.attrs.align) {
@@ -976,6 +1687,27 @@ function createDividerCell(align, width) {
   }
 
   return "-".repeat(hyphenCount);
+}
+
+function repairLegacyMarkdown(markdown) {
+  return markdown
+    .replace(/\\`([^`\n]+)\\`/g, "`$1`")
+    .replace(/\\~\\~([^~\n]+)\\~\\~/g, "~~$1~~")
+    .replace(/^((?:\s*)(?:[-+*]|\d+\.)\s+)\\\[( |x|X)\\\](\s+)/gm, "$1[$2]$3");
+}
+
+function preprocessMathBlocks(markdown) {
+  return markdown.replace(/^(\s*)\$\$([\s\S]*?)^\1\$\$/gm, (_match, indent, content) => {
+    return `${indent}\`\`\`math\n${content.trim()}\n${indent}\`\`\``;
+  });
+}
+
+function preprocessMarkdown(markdown) {
+  return preprocessMathBlocks(repairLegacyMarkdown(markdown));
+}
+
+function normalizeSerializedMarkdown(markdown) {
+  return markdown.replace(/^((?:\s*)(?:[-+*]|\d+\.)\s+)\\\[( |x|X)\\\](\s+)/gm, "$1[$2]$3");
 }
 
 function splitMarkdownTableCells(text) {
@@ -1155,6 +1887,54 @@ function buildInputRules() {
       (match) => ({ order: Number.parseInt(match[1], 10) || 1 }),
       (match, node) => node.childCount + node.attrs.order === Number.parseInt(match[1], 10),
     ),
+    new InputRule(/~~([^~]+)~~$/, (state, match, start, end) => {
+      const text = match[1];
+      const strikeMark = editorSchema.marks.strike;
+      const { tr } = state;
+
+      tr.replaceWith(start, end, editorSchema.text(text, [strikeMark.create()]));
+      return tr;
+    }),
+    new InputRule(/\$([^$\n]+)\$$/, (state, match, start, end) => {
+      const formula = match[1];
+      const mathInline = editorSchema.nodes.math_inline.create({ formula });
+      const { tr } = state;
+
+      tr.replaceWith(start, end, mathInline);
+      return tr;
+    }),
+    new InputRule(/\|[\s:\-|]+\|\s*$/, (state, _match, start, end) => {
+      const { $from } = state.selection;
+      if ($from.depth !== 1 || $from.parent.type !== editorSchema.nodes.paragraph) return null;
+
+      const currentIndex = $from.index(0);
+      if (currentIndex === 0) return null;
+
+      const previousNode = state.doc.child(currentIndex - 1);
+      if (previousNode.type !== editorSchema.nodes.paragraph) return null;
+
+      const headerCells = splitMarkdownTableCells(previousNode.textContent);
+      const alignments = parseMarkdownTableAlignment($from.parent.textContent);
+
+      if (!headerCells || !alignments || headerCells.length !== alignments.length) return null;
+
+      const currentPos = $from.before(1);
+      const previousPos = currentPos - previousNode.nodeSize;
+      const table = createTableNode(2, headerCells.length, { headerLabels: headerCells, alignments });
+
+      const { tr } = state;
+      tr.replaceWith(previousPos, currentPos + $from.parent.nodeSize, table);
+      tr.setSelection(TextSelection.create(tr.doc, getTableCellTextPosition(previousPos, table, 1, 0))).scrollIntoView();
+      return tr;
+    }),
+    new InputRule(/`([^`]+)`$/, (state, match, start, end) => {
+      const text = match[1];
+      const codeMark = editorSchema.marks.code;
+      const { tr } = state;
+
+      tr.replaceWith(start, end, editorSchema.text(text, [codeMark.create()]));
+      return tr;
+    }),
   ];
 
   return inputRules({ rules });
@@ -1211,6 +1991,60 @@ function codeFenceHandler() {
 
     return true;
   };
+}
+
+function mathFenceHandler() {
+  return (state, dispatch) => {
+    const { $from } = state.selection;
+    const parent = $from.parent;
+
+    if (!state.selection.empty || parent.type !== editorSchema.nodes.paragraph) {
+      return false;
+    }
+
+    const text = parent.textContent.trim();
+    if (text !== "$$") {
+      return false;
+    }
+
+    const position = $from.before();
+    const mathBlock = editorSchema.nodes.code_block.create({ params: "math" });
+    let transaction = state.tr.replaceWith(position, position + parent.nodeSize, mathBlock);
+    transaction = transaction.setSelection(TextSelection.create(transaction.doc, position + 1)).scrollIntoView();
+
+    if (dispatch) {
+      dispatch(transaction);
+    }
+
+    return true;
+  };
+}
+
+function detectTabSize(content) {
+  if (!content) return { size: 2, char: "  " };
+
+  if (/\t/.test(content)) {
+    return { size: 4, char: "\t" };
+  }
+
+  const levels = [];
+  for (const line of content.split("\n")) {
+    const spaces = line.match(/^ +/);
+    if (spaces && spaces[0].length > 0) levels.push(spaces[0].length);
+  }
+
+  if (levels.length === 0) return { size: 2, char: "  " };
+
+  const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+  let g = levels[0];
+  for (let i = 1; i < levels.length; i++) g = gcd(g, levels[i]);
+
+  if (g <= 1) {
+    g = levels.every(n => n % 4 === 0) ? 4 : 2;
+  }
+
+  g = Math.min(g, 8);
+  return { size: g, char: " ".repeat(g) };
 }
 
 function resolveLanguage(params) {
@@ -1280,6 +2114,10 @@ function renderSelectedPlainText(text, selectionStart, selectionEnd) {
 }
 
 function renderPrismContent(content, state) {
+  if (content == null) {
+    return "";
+  }
+
   if (typeof content === "string") {
     const html = renderSelectedPlainText(content, state.selectionStart - state.offset, state.selectionEnd - state.offset);
     state.offset += content.length;
@@ -1307,17 +2145,46 @@ function renderHighlightedCode(text, grammar, selectionStart, selectionEnd) {
 }
 
 function serializeMarkdown() {
-  return markdownSerializer.serialize(view.state.doc);
+  let doc = view.state.doc;
+  const last = doc.lastChild;
+  if (last && last.type === editorSchema.nodes.paragraph && last.content.size === 0) {
+    doc = doc.cut(0, doc.content.size - last.nodeSize);
+  }
+  return normalizeSerializedMarkdown(markdownSerializer.serialize(doc));
+}
+
+function addTableRowOnModEnter(state, dispatch, view) {
+  if (!isInTable(state)) return false;
+  return addRowAfter(state, dispatch, view);
+}
+
+function deleteLineWhenFullySelected(state, dispatch) {
+  if (state.selection.empty) return false;
+
+  const { $from, to, from } = state.selection;
+  if ($from.depth !== 1) return false;
+
+  const parent = $from.parent;
+  if (!parent.isTextblock) return false;
+
+  const parentStart = $from.start(1);
+  const parentEnd = $from.end(1);
+  if (from !== parentStart || to !== parentEnd) return false;
+
+  if (dispatch) {
+    dispatch(state.tr.delete($from.before(1), $from.after(1)));
+  }
+  return true;
 }
 
 function createState(markdown) {
   let state = EditorState.create({
-    doc: markdownParser.parse(markdown),
+    doc: markdownParser.parse(preprocessMarkdown(markdown)),
     plugins: [
       history(),
       buildInputRules(),
       keymap({
-        Enter: chainCommands(markdownTableHandler(), codeFenceHandler(), splitListItem(editorSchema.nodes.list_item), createParagraphNear, liftEmptyBlock, splitBlock),
+        Enter: chainCommands(markdownTableHandler(), mathFenceHandler(), codeFenceHandler(), splitListItem(editorSchema.nodes.list_item), createParagraphNear, liftEmptyBlock, splitBlock),
         Tab: chainCommands(goToNextCell(1), sinkListItem(editorSchema.nodes.list_item)),
         "Shift-Tab": chainCommands(goToNextCell(-1), liftListItem(editorSchema.nodes.list_item)),
         "Mod-z": undo,
@@ -1329,6 +2196,9 @@ function createState(markdown) {
         ArrowRight: arrowHandler("right"),
         ArrowUp: arrowHandler("up"),
         ArrowDown: arrowHandler("down"),
+        "Mod-Enter": addTableRowOnModEnter,
+        Backspace: deleteLineWhenFullySelected,
+        Delete: deleteLineWhenFullySelected,
       }),
       columnResizing(),
       tableEditing(),
@@ -1337,7 +2207,17 @@ function createState(markdown) {
   });
 
   const fix = fixTables(state);
-  return fix ? state.apply(fix.setMeta("addToHistory", false)) : state;
+  state = fix ? state.apply(fix.setMeta("addToHistory", false)) : state;
+
+  const lastChild = state.doc.lastChild;
+  const paragraphType = editorSchema.nodes.paragraph;
+  if (!lastChild || lastChild.type !== paragraphType || lastChild.content.size > 0) {
+    const tr = state.tr;
+    tr.insert(state.doc.content.size, paragraphType.create());
+    state = state.apply(tr.setMeta("addToHistory", false));
+  }
+
+  return state;
 }
 
 function setPersistentStatus(message) {
@@ -1394,9 +2274,12 @@ function isMarkActive(state, markType) {
 function updateToolbarState(state) {
   const { $from } = state.selection;
   const inTable = isInTable(state);
+  const inCodeBlock = $from.parent.type === editorSchema.nodes.code_block;
+  const codeBlockParams = inCodeBlock ? $from.parent.attrs.params?.trim()?.toLowerCase() : "";
   const buttonMap = {
     bold: isMarkActive(state, editorSchema.marks.strong),
     italic: isMarkActive(state, editorSchema.marks.em),
+    strike: isMarkActive(state, editorSchema.marks.strike),
     inlineCode: isMarkActive(state, editorSchema.marks.code),
     h1: $from.parent.type === editorSchema.nodes.heading && $from.parent.attrs.level === 1,
     h2: $from.parent.type === editorSchema.nodes.heading && $from.parent.attrs.level === 2,
@@ -1404,7 +2287,9 @@ function updateToolbarState(state) {
     bulletList: hasAncestor($from, editorSchema.nodes.bullet_list),
     orderedList: hasAncestor($from, editorSchema.nodes.ordered_list),
     table: false,
-    codeBlock: $from.parent.type === editorSchema.nodes.code_block,
+    codeBlock: inCodeBlock && codeBlockParams !== "math" && codeBlockParams !== "mermaid",
+    mathBlock: inCodeBlock && codeBlockParams === "math",
+    mermaidBlock: inCodeBlock && codeBlockParams === "mermaid",
   };
 
   if (toolbarCallback) {
@@ -1511,15 +2396,33 @@ export function createTyporaEditor(options) {
   view = new EditorView(element, {
     state: createState(markdown),
     nodeViews: {
+      math_inline(node, editorView, getPos) {
+        return new InlineMathView(node, editorView, getPos);
+      },
       table(node, editorView, getPos) {
         return new AdjustableTableView(node, editorView, getPos);
       },
       code_block(node, editorView, getPos) {
+        const params = (node.attrs.params || "").trim().toLowerCase();
+        if (params === "math") return new MathBlockView(node, editorView, getPos);
+        if (params === "mermaid") return new MermaidBlockView(node, editorView, getPos);
         return new CodeBlockView(node, editorView, getPos);
       },
     },
     dispatchTransaction(transaction) {
-      const nextState = view.state.apply(transaction);
+      let nextState = view.state.apply(transaction);
+      const lastChild = nextState.doc.lastChild;
+      const paragraphType = editorSchema.nodes.paragraph;
+      const needsTrailingParagraph = !lastChild || lastChild.type !== paragraphType || lastChild.content.size > 0;
+      if (needsTrailingParagraph) {
+        const tr = nextState.tr;
+        if (!lastChild) {
+          tr.insert(0, paragraphType.create());
+        } else {
+          tr.insert(nextState.doc.content.size, paragraphType.create());
+        }
+        nextState = nextState.apply(tr);
+      }
       view.updateState(nextState);
       updateStats(nextState);
 
@@ -1531,6 +2434,13 @@ export function createTyporaEditor(options) {
 
   setPersistentStatus(persistentStatus);
   updateStats(view.state);
+
+  prismReady.then(() => {
+    for (const codeBlock of codeBlockViews) {
+      codeBlock.renderHighlight();
+    }
+  });
+
   if (readyCallback) {
     readyCallback({
       markdown: serializeMarkdown(),

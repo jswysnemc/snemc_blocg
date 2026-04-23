@@ -195,11 +195,19 @@ func (s *Store) DeleteSemanticIndexTx(ctx context.Context, tx *sql.Tx, postID in
 }
 
 func (s *Store) UpsertSemanticVector(ctx context.Context, postID int64, embeddingJSON string) error {
-	_, err := s.db.ExecContext(ctx, `
-INSERT OR REPLACE INTO post_semantic_vec(rowid, embedding)
-VALUES (?, ?)
-`, postID, embeddingJSON)
-	return err
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM post_semantic_vec WHERE rowid = ?`, postID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO post_semantic_vec(rowid, embedding) VALUES (?, ?)`, postID, embeddingJSON); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Store) EnsureSemanticVectorTable(ctx context.Context, dimensions int) (bool, error) {

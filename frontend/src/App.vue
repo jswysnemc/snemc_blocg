@@ -35,6 +35,10 @@ const pageTitle = computed(() => {
   return item?.label ?? "后台控制台";
 });
 
+const isEditorPage = computed(() =>
+  route.path.startsWith("/posts/new") || (route.path.startsWith("/posts/") && route.path !== "/posts"),
+);
+
 const selectedKeys = computed(() => {
   const match = menuItems.find((item) => route.path.startsWith(item.key));
   return match ? [match.key] : ["/dashboard"];
@@ -129,7 +133,7 @@ watch(
             </a>
           </a-space>
         </header>
-        <main class="admin-main">
+        <main class="admin-main" :class="{ 'admin-main-editor': isEditorPage }">
           <RouterView />
         </main>
       </div>

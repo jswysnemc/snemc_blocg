@@ -47,17 +47,18 @@ func NewRenderer() *Renderer {
 	policy.AllowAttrs("src", "alt", "title", "loading", "decoding", "width", "height").OnElements("img")
 	policy.AllowAttrs("class").OnElements("img")
 	policy.AllowAttrs("src", "title", "allow", "allowfullscreen", "loading", "referrerpolicy", "frameborder").OnElements("iframe")
+	policy.AllowAttrs("type", "checked", "disabled").OnElements("input")
 	policy.AllowURLSchemes("http", "https", "mailto")
 	policy.RequireParseableURLs(true)
 	policy.AllowStandardURLs()
-	policy.AllowElements("figure", "figcaption")
+	policy.AllowElements("figure", "figcaption", "del", "s", "input")
 	policy.AllowAttrs("class").OnElements("table", "thead", "tbody", "tr", "th", "td")
+	policy.AllowAttrs("align").OnElements("th", "td")
 
 	return &Renderer{
 		md: goldmark.New(
 			goldmark.WithExtensions(
-				extension.GFM,
-				extension.Table,
+				extension.NewTable(extension.WithTableCellAlignMethod(extension.TableCellAlignAttribute)),
 				extension.Strikethrough,
 				extension.TaskList,
 				extension.Linkify,
