@@ -26,8 +26,10 @@
       </form>
       <p class="search-submit-status" data-search-status hidden></p>
       {{if .Notice}}<p class="search-notice">{{.Notice}}</p>{{end}}
-      <p class="search-count">当前模式：{{if eq .ExecutedMode "semantic"}}语义搜索{{else}}关键词搜索{{end}}</p>
-      <p class="search-count">共找到 {{.ResultCount}} 条结果</p>
+      <div class="search-meta-bar">
+        <span class="search-count">共找到 <strong>{{.ResultCount}}</strong> 条结果</span>
+        <span class="search-mode-badge">{{if eq .ExecutedMode "semantic"}}语义搜索{{else}}关键词搜索{{end}}</span>
+      </div>
     </section>
     <div class="content-with-sidebar">
       <section class="content-panel">
@@ -39,13 +41,16 @@
               <span class="stat">{{.ReadingTime}} min</span>
             </div>
             <h3><a href="/posts/{{.Slug}}">{{.Title}}</a></h3>
-            <p class="muted">{{safeHTML .Snippet}}</p>
+            <p class="snippet">{{safeHTML .Snippet}}</p>
             <div class="tag-row">
               {{range .Tags}}<a class="tag" href="/tag/{{.Slug}}">#{{.Name}}</a>{{end}}
             </div>
           </article>
           {{else}}
-          <p class="empty-text">没有匹配结果，换一个更具体的关键词试试。</p>
+          <div class="empty-state">
+            <div class="empty-state-icon">?</div>
+            <p>没有匹配结果，换一个更具体的关键词试试。</p>
+          </div>
           {{end}}
         </div>
       </section>

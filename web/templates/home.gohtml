@@ -39,8 +39,10 @@
       <p>{{.Featured.Summary}}</p>
       <div class="featured-meta">
         <a class="button primary" href="/posts/{{.Featured.Slug}}">阅读文章</a>
-        <span>{{.Featured.ReadingTime}} 分钟阅读</span>
-        <span>{{.Featured.Views}} 次浏览</span>
+        <div class="meta-row">
+          <span>{{.Featured.ReadingTime}} 分钟阅读</span>
+          <span>{{.Featured.Views}} 次浏览</span>
+        </div>
       </div>
     </section>
     {{end}}
