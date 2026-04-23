@@ -257,6 +257,9 @@
   background: rgba(22, 93, 255, 0.06);
   vertical-align: baseline;
   cursor: pointer;
+  white-space: nowrap;
+  word-break: normal;
+  flex-wrap: nowrap;
 }
 
 .typora-editor .pm-inline-math .katex {

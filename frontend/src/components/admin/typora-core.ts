@@ -7,46 +7,31 @@ import "katex/dist/katex.min.css";
 import markdownIt from "markdown-it";
 import mermaid from "mermaid";
 import Prism from "prismjs";
+import "prismjs/components/prism-markup";
+import "prismjs/components/prism-clike";
+import "prismjs/components/prism-javascript";
+import "prismjs/components/prism-jsx";
+import "prismjs/components/prism-typescript";
+import "prismjs/components/prism-tsx";
+import "prismjs/components/prism-bash";
+import "prismjs/components/prism-c";
+import "prismjs/components/prism-cpp";
+import "prismjs/components/prism-css";
+import "prismjs/components/prism-java";
+import "prismjs/components/prism-json";
+import "prismjs/components/prism-lua";
+import "prismjs/components/prism-markdown";
+import "prismjs/components/prism-python";
+import "prismjs/components/prism-rust";
+import "prismjs/components/prism-sql";
+import "prismjs/components/prism-yaml";
+import "prismjs/components/prism-go";
 
 if (typeof window !== "undefined") {
   window.Prism = Prism;
 }
 
-const prismLanguageModules = [
-  "prismjs/components/prism-markup",
-  "prismjs/components/prism-clike",
-  "prismjs/components/prism-javascript",
-  "prismjs/components/prism-jsx",
-  "prismjs/components/prism-typescript",
-  "prismjs/components/prism-tsx",
-  "prismjs/components/prism-bash",
-  "prismjs/components/prism-c",
-  "prismjs/components/prism-cpp",
-  "prismjs/components/prism-css",
-  "prismjs/components/prism-java",
-  "prismjs/components/prism-json",
-  "prismjs/components/prism-lua",
-  "prismjs/components/prism-markdown",
-  "prismjs/components/prism-python",
-  "prismjs/components/prism-rust",
-  "prismjs/components/prism-sql",
-  "prismjs/components/prism-yaml",
-  "prismjs/components/prism-go",
-];
-
-async function loadPrismModule(moduleId) {
-  try {
-    await import(moduleId);
-  } catch (error) {
-    console.error(`[typora] Prism language load failed: ${moduleId}`, error);
-  }
-}
-
-const prismReady = (async () => {
-  for (const moduleId of prismLanguageModules) {
-    await loadPrismModule(moduleId);
-  }
-})();
+const prismReady = Promise.resolve();
 
 const codeBlockViews = new Set();
 import { baseKeymap, chainCommands, createParagraphNear, exitCode, liftEmptyBlock, setBlockType, splitBlock, toggleMark, wrapIn } from "prosemirror-commands";
@@ -1697,8 +1682,8 @@ function repairLegacyMarkdown(markdown) {
 }
 
 function preprocessMathBlocks(markdown) {
-  return markdown.replace(/^(\s*)\$\$([\s\S]*?)^\1\$\$/gm, (_match, indent, content) => {
-    return `${indent}\`\`\`math\n${content.trim()}\n${indent}\`\`\``;
+  return markdown.replace(/^(\s*)\$\$\s*$(\n[\s\S]*?)^\1\$\$\s*$/gm, (_match, indent, content) => {
+    return `${indent}\`\`\`math${content}${indent}\`\`\``;
   });
 }
 
@@ -1879,7 +1864,7 @@ function toggleCodeBlock() {
 function buildInputRules() {
   const rules = [
     textblockTypeInputRule(/^(#{1,6})\s$/, editorSchema.nodes.heading, (match) => ({ level: match[1].length })),
-    wrappingInputRule(/^\s*>\s$/, editorSchema.nodes.blockquote),
+    wrappingInputRule(/^\s*>\s+$/, editorSchema.nodes.blockquote),
     wrappingInputRule(/^\s*([-+*])\s$/, editorSchema.nodes.bullet_list),
     wrappingInputRule(
       /^(\d+)\.\s$/,
