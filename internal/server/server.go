@@ -103,6 +103,35 @@ type SearchPage struct {
 	ResultCount   int
 }
 
+type AboutFriend struct {
+	Name        string
+	Description string
+	URL         string
+	Accent      string
+}
+
+type AboutStat struct {
+	Label string
+	Value string
+}
+
+type AboutProfile struct {
+	Name       string
+	Tagline    string
+	AvatarURL  string
+	AvatarText string
+	Email      string
+	GitHubURL  string
+	Bio        string
+	Stats      []AboutStat
+	Friends    []AboutFriend
+}
+
+type AboutPage struct {
+	PageMeta
+	Profile AboutProfile
+}
+
 type PostPage struct {
 	PageMeta
 	Post            store.PostDetail
@@ -207,6 +236,7 @@ func (a *App) routes() http.Handler {
 	r.Handle("/front/*", http.StripPrefix("/front/", http.FileServer(http.Dir(a.cfg.FrontendDistDir))))
 
 	r.Get("/", a.handleHome)
+	r.Get("/about", a.handleAboutPage)
 	r.Get("/archive", a.handleArchivePage)
 	r.Get("/search", a.handleSearchPage)
 	r.Get("/category/{slug}", a.handleCategoryPage)

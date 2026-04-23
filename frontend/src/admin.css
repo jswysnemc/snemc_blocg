@@ -410,13 +410,11 @@
 }
 
 .editor-stage {
-  border: 1px solid #e2e8f0;
-  border-radius: 24px;
-  padding: 22px;
-  background:
-    radial-gradient(circle at top right, rgba(22, 93, 255, 0.04), transparent 28%),
-    linear-gradient(180deg, #fff 0%, #f7f9fc 100%);
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   min-height: 0;
 }
 
@@ -592,7 +590,7 @@
   .editor-stage {
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .editor-stage-top {
@@ -767,8 +765,8 @@
   }
 
   .editor-stage {
-    padding: 16px;
-    border-radius: 18px;
+    padding: 0;
+    border-radius: 0;
   }
 
   .editor-title-input .arco-input-wrapper,

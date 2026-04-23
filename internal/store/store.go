@@ -78,14 +78,16 @@ func (s *Store) Bootstrap(ctx context.Context, cfg config.Config) error {
 
 func (s *Store) ensureAppSettings(ctx context.Context, cfg config.Config) error {
 	_, err := s.db.ExecContext(ctx, `
-INSERT INTO app_settings (
-	id, smtp_host, smtp_port, smtp_username, smtp_password, smtp_from,
-	admin_notify_email, llm_base_url, llm_api_key, llm_model, llm_system_prompt,
-	embedding_base_url, embedding_api_key, embedding_model, embedding_dimensions,
-	embedding_timeout_ms, semantic_search_enabled, comment_review_mode, updated_at
-) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-ON CONFLICT(id) DO NOTHING
-`, cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPFrom, cfg.CommentNotifyTo, cfg.LLMBaseURL, cfg.LLMAPIKey, cfg.LLMModel, cfg.LLMSystemPrompt, cfg.EmbeddingBaseURL, cfg.EmbeddingAPIKey, cfg.EmbeddingModel, cfg.EmbeddingDimensions, cfg.EmbeddingTimeoutMS, boolToInt(cfg.SemanticSearchEnabled), CommentReviewModeManualAll)
+	INSERT INTO app_settings (
+		id, smtp_host, smtp_port, smtp_username, smtp_password, smtp_from,
+		admin_notify_email, llm_base_url, llm_api_key, llm_model, llm_system_prompt,
+		embedding_base_url, embedding_api_key, embedding_model, embedding_dimensions,
+		embedding_timeout_ms, semantic_search_enabled, comment_review_mode,
+		about_name, about_tagline, about_avatar_url, about_email, about_github_url,
+		about_bio, about_repo_count, about_star_count, about_fork_count, about_friend_links, updated_at
+	) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+	ON CONFLICT(id) DO NOTHING
+	`, cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPFrom, cfg.CommentNotifyTo, cfg.LLMBaseURL, cfg.LLMAPIKey, cfg.LLMModel, cfg.LLMSystemPrompt, cfg.EmbeddingBaseURL, cfg.EmbeddingAPIKey, cfg.EmbeddingModel, cfg.EmbeddingDimensions, cfg.EmbeddingTimeoutMS, boolToInt(cfg.SemanticSearchEnabled), CommentReviewModeManualAll, cfg.SiteName, "构建简洁、优雅的数字体验", "", "", "", "这里可以写站点或作者简介。", "", "", "", "")
 	return err
 }
 

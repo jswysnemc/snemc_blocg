@@ -48,6 +48,25 @@ func (a *App) handleHome(w http.ResponseWriter, r *http.Request) {
 	a.renderTemplate(w, "home", page)
 }
 
+func (a *App) handleAboutPage(w http.ResponseWriter, r *http.Request) {
+	settings, err := a.appSettings(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	page := AboutPage{
+		PageMeta: a.pageMeta(
+			r,
+			"关于 | "+a.cfg.SiteName,
+			"了解站点作者、开源偏好与常用协作链接。",
+		),
+		Profile: aboutProfileFromSettings(settings, a.cfg.SiteName),
+	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	a.renderTemplate(w, "about", page)
+}
+
 func (a *App) handleArchivePage(w http.ResponseWriter, r *http.Request) {
 	const pageSize = 8
 
@@ -201,6 +220,7 @@ func (a *App) handleSitemap(w http.ResponseWriter, r *http.Request) {
 	buf.WriteString(`<?xml version="1.0" encoding="UTF-8"?>`)
 	buf.WriteString(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`)
 	buf.WriteString(fmt.Sprintf(`<url><loc>%s/</loc></url>`, strings.TrimRight(a.cfg.SiteURL, "/")))
+	buf.WriteString(fmt.Sprintf(`<url><loc>%s/about</loc></url>`, strings.TrimRight(a.cfg.SiteURL, "/")))
 	for _, post := range posts {
 		buf.WriteString(fmt.Sprintf(`<url><loc>%s/posts/%s</loc></url>`, strings.TrimRight(a.cfg.SiteURL, "/"), template.HTMLEscapeString(post.Slug)))
 	}
@@ -780,6 +800,137 @@ func (a *App) applyPostCacheHeaders(w http.ResponseWriter, r *http.Request, post
 			w.Header().Set("X-Cache-ShortCircuit", "304")
 		}
 	}
+}
+
+func aboutProfileFromSettings(settings store.AppSettings, siteName string) AboutProfile {
+	name := strings.TrimSpace(settings.AboutName)
+	if name == "" {
+		name = siteName
+	}
+
+	tagline := strings.TrimSpace(settings.AboutTagline)
+	if tagline == "" {
+		tagline = "构建简洁、清晰、长期可维护的数字内容体验"
+	}
+
+	bio := strings.TrimSpace(settings.AboutBio)
+	if bio == "" {
+		bio = "这里可以通过后台设置页配置站点简介、联系方式、开源统计与友链。"
+	}
+
+	stats := make([]AboutStat, 0, 3)
+	if value := strings.TrimSpace(settings.AboutRepoCount); value != "" {
+		stats = append(stats, AboutStat{Label: "仓库", Value: value})
+	}
+	if value := strings.TrimSpace(settings.AboutStarCount); value != "" {
+		stats = append(stats, AboutStat{Label: "Stars", Value: value})
+	}
+	if value := strings.TrimSpace(settings.AboutForkCount); value != "" {
+		stats = append(stats, AboutStat{Label: "Forks", Value: value})
+	}
+
+	return AboutProfile{
+		Name:       name,
+		Tagline:    tagline,
+		AvatarURL:  strings.TrimSpace(settings.AboutAvatarURL),
+		AvatarText: aboutAvatarText(name),
+		Email:      strings.TrimSpace(settings.AboutEmail),
+		GitHubURL:  strings.TrimSpace(settings.AboutGitHubURL),
+		Bio:        bio,
+		Stats:      stats,
+		Friends:    parseAboutFriends(settings.AboutFriendLinks),
+	}
+}
+
+func aboutAvatarText(name string) string {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return "A"
+	}
+
+	runes := []rune(trimmed)
+	if len(runes) == 1 {
+		return strings.ToUpper(trimmed)
+	}
+
+	first := strings.ToUpper(string(runes[0]))
+	last := strings.ToUpper(string(runes[len(runes)-1]))
+	if first == last {
+		return first
+	}
+	return first + last
+}
+
+func parseAboutFriends(raw string) []AboutFriend {
+	fallbackAccents := []string{
+		"linear-gradient(135deg, #5b7cfa 0%, #6fd3ff 100%)",
+		"linear-gradient(135deg, #f97316 0%, #fb7185 100%)",
+		"linear-gradient(135deg, #14b8a6 0%, #60a5fa 100%)",
+		"linear-gradient(135deg, #a855f7 0%, #6366f1 100%)",
+	}
+
+	lines := strings.Split(raw, "\n")
+	friends := make([]AboutFriend, 0, len(lines))
+	for index, line := range lines {
+		parts := strings.Split(line, "|")
+		if len(parts) < 3 {
+			continue
+		}
+
+		name := strings.TrimSpace(parts[0])
+		description := strings.TrimSpace(parts[1])
+		link := strings.TrimSpace(parts[2])
+		if name == "" || description == "" || link == "" {
+			continue
+		}
+		if !strings.HasPrefix(link, "http://") && !strings.HasPrefix(link, "https://") {
+			continue
+		}
+
+		accent := fallbackAccents[index%len(fallbackAccents)]
+		if len(parts) >= 4 {
+			if parsed := parseAboutAccent(parts[3]); parsed != "" {
+				accent = parsed
+			}
+		}
+
+		friends = append(friends, AboutFriend{
+			Name:        name,
+			Description: description,
+			URL:         link,
+			Accent:      accent,
+		})
+	}
+
+	return friends
+}
+
+func parseAboutAccent(raw string) string {
+	parts := strings.Split(strings.TrimSpace(raw), ",")
+	if len(parts) != 2 {
+		return ""
+	}
+
+	left := normalizeHexColor(parts[0])
+	right := normalizeHexColor(parts[1])
+	if left == "" || right == "" {
+		return ""
+	}
+
+	return fmt.Sprintf("linear-gradient(135deg, %s 0%%, %s 100%%)", left, right)
+}
+
+func normalizeHexColor(raw string) string {
+	value := strings.TrimSpace(raw)
+	if len(value) != 7 || !strings.HasPrefix(value, "#") {
+		return ""
+	}
+	for _, ch := range value[1:] {
+		if (ch < '0' || ch > '9') && (ch < 'a' || ch > 'f') && (ch < 'A' || ch > 'F') {
+			return ""
+		}
+	}
+	return value
 }
 
 func parseQueryInt(r *http.Request, key string, fallback int) int {

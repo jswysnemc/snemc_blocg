@@ -173,6 +173,16 @@ func migrate(db *sql.DB) error {
 				embedding_timeout_ms INTEGER NOT NULL DEFAULT 15000,
 				semantic_search_enabled INTEGER NOT NULL DEFAULT 0,
 				comment_review_mode TEXT NOT NULL DEFAULT 'manual_all',
+				about_name TEXT NOT NULL DEFAULT '',
+				about_tagline TEXT NOT NULL DEFAULT '',
+				about_avatar_url TEXT NOT NULL DEFAULT '',
+				about_email TEXT NOT NULL DEFAULT '',
+				about_github_url TEXT NOT NULL DEFAULT '',
+				about_bio TEXT NOT NULL DEFAULT '',
+				about_repo_count TEXT NOT NULL DEFAULT '',
+				about_star_count TEXT NOT NULL DEFAULT '',
+				about_fork_count TEXT NOT NULL DEFAULT '',
+				about_friend_links TEXT NOT NULL DEFAULT '',
 				updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 			);`,
 		`CREATE TABLE IF NOT EXISTS post_semantic_index (
@@ -251,6 +261,16 @@ func migrate(db *sql.DB) error {
 		`ALTER TABLE app_settings ADD COLUMN embedding_timeout_ms INTEGER NOT NULL DEFAULT 15000;`,
 		`ALTER TABLE app_settings ADD COLUMN semantic_search_enabled INTEGER NOT NULL DEFAULT 0;`,
 		`ALTER TABLE app_settings ADD COLUMN comment_review_mode TEXT NOT NULL DEFAULT 'manual_all';`,
+		`ALTER TABLE app_settings ADD COLUMN about_name TEXT NOT NULL DEFAULT '';`,
+		`ALTER TABLE app_settings ADD COLUMN about_tagline TEXT NOT NULL DEFAULT '';`,
+		`ALTER TABLE app_settings ADD COLUMN about_avatar_url TEXT NOT NULL DEFAULT '';`,
+		`ALTER TABLE app_settings ADD COLUMN about_email TEXT NOT NULL DEFAULT '';`,
+		`ALTER TABLE app_settings ADD COLUMN about_github_url TEXT NOT NULL DEFAULT '';`,
+		`ALTER TABLE app_settings ADD COLUMN about_bio TEXT NOT NULL DEFAULT '';`,
+		`ALTER TABLE app_settings ADD COLUMN about_repo_count TEXT NOT NULL DEFAULT '';`,
+		`ALTER TABLE app_settings ADD COLUMN about_star_count TEXT NOT NULL DEFAULT '';`,
+		`ALTER TABLE app_settings ADD COLUMN about_fork_count TEXT NOT NULL DEFAULT '';`,
+		`ALTER TABLE app_settings ADD COLUMN about_friend_links TEXT NOT NULL DEFAULT '';`,
 	}
 	for _, stmt := range optionalStatements {
 		if _, err := db.Exec(stmt); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {

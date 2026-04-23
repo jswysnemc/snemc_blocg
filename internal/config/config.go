@@ -215,24 +215,24 @@ func applyFileConfig(cfg Config, path string) Config {
 		cfg.RecommendationN = *file.Features.RecommendationN
 	}
 
-	applyRuntimeString(&cfg.SMTPHost, file.Mail.SMTPHost, &cfg.RuntimeOverrides.SMTPHost)
-	applyRuntimeString(&cfg.SMTPPort, file.Mail.SMTPPort, &cfg.RuntimeOverrides.SMTPPort)
-	applyRuntimeString(&cfg.SMTPUsername, file.Mail.SMTPUser, &cfg.RuntimeOverrides.SMTPUsername)
-	applyRuntimeString(&cfg.SMTPPassword, file.Mail.SMTPPass, &cfg.RuntimeOverrides.SMTPPassword)
-	applyRuntimeString(&cfg.SMTPFrom, file.Mail.SMTPFrom, &cfg.RuntimeOverrides.SMTPFrom)
-	applyRuntimeString(&cfg.CommentNotifyTo, file.Mail.NotifyTo, &cfg.RuntimeOverrides.AdminNotifyEmail)
+	applyOptionalString(&cfg.SMTPHost, file.Mail.SMTPHost)
+	applyOptionalString(&cfg.SMTPPort, file.Mail.SMTPPort)
+	applyOptionalString(&cfg.SMTPUsername, file.Mail.SMTPUser)
+	applyOptionalString(&cfg.SMTPPassword, file.Mail.SMTPPass)
+	applyOptionalString(&cfg.SMTPFrom, file.Mail.SMTPFrom)
+	applyOptionalString(&cfg.CommentNotifyTo, file.Mail.NotifyTo)
 
-	applyRuntimeString(&cfg.LLMBaseURL, file.LLM.BaseURL, &cfg.RuntimeOverrides.LLMBaseURL)
-	applyRuntimeString(&cfg.LLMAPIKey, file.LLM.APIKey, &cfg.RuntimeOverrides.LLMAPIKey)
-	applyRuntimeString(&cfg.LLMModel, file.LLM.Model, &cfg.RuntimeOverrides.LLMModel)
-	applyRuntimeString(&cfg.LLMSystemPrompt, file.LLM.SystemPrompt, &cfg.RuntimeOverrides.LLMSystemPrompt)
+	applyOptionalString(&cfg.LLMBaseURL, file.LLM.BaseURL)
+	applyOptionalString(&cfg.LLMAPIKey, file.LLM.APIKey)
+	applyOptionalString(&cfg.LLMModel, file.LLM.Model)
+	applyOptionalString(&cfg.LLMSystemPrompt, file.LLM.SystemPrompt)
 
-	applyRuntimeString(&cfg.EmbeddingBaseURL, file.Embedding.BaseURL, &cfg.RuntimeOverrides.EmbeddingBaseURL)
-	applyRuntimeString(&cfg.EmbeddingAPIKey, file.Embedding.APIKey, &cfg.RuntimeOverrides.EmbeddingAPIKey)
-	applyRuntimeString(&cfg.EmbeddingModel, file.Embedding.Model, &cfg.RuntimeOverrides.EmbeddingModel)
-	applyRuntimeInt(&cfg.EmbeddingDimensions, file.Embedding.Dimensions, &cfg.RuntimeOverrides.EmbeddingDimensions)
-	applyRuntimeInt(&cfg.EmbeddingTimeoutMS, file.Embedding.TimeoutMS, &cfg.RuntimeOverrides.EmbeddingTimeoutMS)
-	applyRuntimeBool(&cfg.SemanticSearchEnabled, file.Embedding.Enabled, &cfg.RuntimeOverrides.SemanticSearchEnabled)
+	applyOptionalString(&cfg.EmbeddingBaseURL, file.Embedding.BaseURL)
+	applyOptionalString(&cfg.EmbeddingAPIKey, file.Embedding.APIKey)
+	applyOptionalString(&cfg.EmbeddingModel, file.Embedding.Model)
+	applyOptionalInt(&cfg.EmbeddingDimensions, file.Embedding.Dimensions)
+	applyOptionalInt(&cfg.EmbeddingTimeoutMS, file.Embedding.TimeoutMS)
+	applyOptionalBool(&cfg.SemanticSearchEnabled, file.Embedding.Enabled)
 
 	return cfg
 }
@@ -366,6 +366,13 @@ func applyRuntimeString(target *string, source *string, marker **string) {
 	*marker = &value
 }
 
+func applyOptionalString(target *string, source *string) {
+	if source == nil {
+		return
+	}
+	*target = *source
+}
+
 func applyRuntimeInt(target *int, source *int, marker **int) {
 	if source == nil {
 		return
@@ -375,6 +382,13 @@ func applyRuntimeInt(target *int, source *int, marker **int) {
 	*marker = &value
 }
 
+func applyOptionalInt(target *int, source *int) {
+	if source == nil {
+		return
+	}
+	*target = *source
+}
+
 func applyRuntimeBool(target *bool, source *bool, marker **bool) {
 	if source == nil {
 		return
@@ -382,6 +396,13 @@ func applyRuntimeBool(target *bool, source *bool, marker **bool) {
 	*target = *source
 	value := *source
 	*marker = &value
+}
+
+func applyOptionalBool(target *bool, source *bool) {
+	if source == nil {
+		return
+	}
+	*target = *source
 }
 
 func envValue(key string) (string, bool) {

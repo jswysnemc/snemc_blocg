@@ -95,6 +95,16 @@ export interface AppSettings {
   embedding_dimensions: number;
   embedding_timeout_ms: number;
   semantic_search_enabled: boolean;
+  about_name: string;
+  about_tagline: string;
+  about_avatar_url: string;
+  about_email: string;
+  about_github_url: string;
+  about_bio: string;
+  about_repo_count: string;
+  about_star_count: string;
+  about_fork_count: string;
+  about_friend_links: string;
 }
 
 export interface AgentAPIKey {

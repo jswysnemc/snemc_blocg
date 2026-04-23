@@ -13,10 +13,10 @@ import (
 func (s *Store) GetAppSettings(ctx context.Context) (AppSettings, error) {
 	var settings AppSettings
 	err := s.db.QueryRowContext(ctx, `
-SELECT
-	smtp_host,
-	smtp_port,
-	smtp_username,
+	SELECT
+		smtp_host,
+		smtp_port,
+		smtp_username,
 	smtp_password,
 	smtp_from,
 	admin_notify_email,
@@ -27,13 +27,23 @@ SELECT
 	embedding_base_url,
 	embedding_api_key,
 	embedding_model,
-	embedding_dimensions,
-	embedding_timeout_ms,
-	semantic_search_enabled,
-	comment_review_mode
-FROM app_settings
-WHERE id = 1
-`).Scan(
+		embedding_dimensions,
+		embedding_timeout_ms,
+		semantic_search_enabled,
+		comment_review_mode,
+		about_name,
+		about_tagline,
+		about_avatar_url,
+		about_email,
+		about_github_url,
+		about_bio,
+		about_repo_count,
+		about_star_count,
+		about_fork_count,
+		about_friend_links
+	FROM app_settings
+	WHERE id = 1
+	`).Scan(
 		&settings.SMTPHost,
 		&settings.SMTPPort,
 		&settings.SMTPUsername,
@@ -47,11 +57,21 @@ WHERE id = 1
 		&settings.EmbeddingBaseURL,
 		&settings.EmbeddingAPIKey,
 		&settings.EmbeddingModel,
-		&settings.EmbeddingDimensions,
-		&settings.EmbeddingTimeoutMS,
-		&settings.SemanticSearchEnabled,
-		&settings.CommentReviewMode,
-	)
+			&settings.EmbeddingDimensions,
+			&settings.EmbeddingTimeoutMS,
+			&settings.SemanticSearchEnabled,
+			&settings.CommentReviewMode,
+			&settings.AboutName,
+			&settings.AboutTagline,
+			&settings.AboutAvatarURL,
+			&settings.AboutEmail,
+			&settings.AboutGitHubURL,
+			&settings.AboutBio,
+			&settings.AboutRepoCount,
+			&settings.AboutStarCount,
+			&settings.AboutForkCount,
+			&settings.AboutFriendLinks,
+		)
 	if errorsIsNoRows(err) {
 		return AppSettings{}, ErrNotFound
 	}
@@ -91,17 +111,27 @@ SET
 	llm_system_prompt = ?,
 	embedding_base_url = ?,
 	embedding_api_key = ?,
-	embedding_model = ?,
-	embedding_dimensions = ?,
-	embedding_timeout_ms = ?,
-	semantic_search_enabled = ?,
-	comment_review_mode = ?,
-	updated_at = CURRENT_TIMESTAMP
+		embedding_model = ?,
+		embedding_dimensions = ?,
+		embedding_timeout_ms = ?,
+		semantic_search_enabled = ?,
+		comment_review_mode = ?,
+		about_name = ?,
+		about_tagline = ?,
+		about_avatar_url = ?,
+		about_email = ?,
+		about_github_url = ?,
+		about_bio = ?,
+		about_repo_count = ?,
+		about_star_count = ?,
+		about_fork_count = ?,
+		about_friend_links = ?,
+		updated_at = CURRENT_TIMESTAMP
 WHERE id = 1
-`, strings.TrimSpace(input.SMTPHost), strings.TrimSpace(input.SMTPPort), strings.TrimSpace(input.SMTPUsername), input.SMTPPassword, strings.TrimSpace(input.SMTPFrom), strings.TrimSpace(input.AdminNotifyEmail), strings.TrimSpace(input.LLMBaseURL), strings.TrimSpace(input.LLMAPIKey), strings.TrimSpace(input.LLMModel), input.LLMSystemPrompt, strings.TrimSpace(input.EmbeddingBaseURL), strings.TrimSpace(input.EmbeddingAPIKey), strings.TrimSpace(input.EmbeddingModel), input.EmbeddingDimensions, input.EmbeddingTimeoutMS, input.SemanticSearchEnabled, input.CommentReviewMode)
-	if err != nil {
-		return AppSettings{}, err
-	}
+`, strings.TrimSpace(input.SMTPHost), strings.TrimSpace(input.SMTPPort), strings.TrimSpace(input.SMTPUsername), input.SMTPPassword, strings.TrimSpace(input.SMTPFrom), strings.TrimSpace(input.AdminNotifyEmail), strings.TrimSpace(input.LLMBaseURL), strings.TrimSpace(input.LLMAPIKey), strings.TrimSpace(input.LLMModel), input.LLMSystemPrompt, strings.TrimSpace(input.EmbeddingBaseURL), strings.TrimSpace(input.EmbeddingAPIKey), strings.TrimSpace(input.EmbeddingModel), input.EmbeddingDimensions, input.EmbeddingTimeoutMS, input.SemanticSearchEnabled, input.CommentReviewMode, strings.TrimSpace(input.AboutName), strings.TrimSpace(input.AboutTagline), strings.TrimSpace(input.AboutAvatarURL), strings.TrimSpace(input.AboutEmail), strings.TrimSpace(input.AboutGitHubURL), strings.TrimSpace(input.AboutBio), strings.TrimSpace(input.AboutRepoCount), strings.TrimSpace(input.AboutStarCount), strings.TrimSpace(input.AboutForkCount), strings.TrimSpace(input.AboutFriendLinks))
+		if err != nil {
+			return AppSettings{}, err
+		}
 	return s.GetAppSettings(ctx)
 }
 

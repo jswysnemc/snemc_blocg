@@ -156,6 +156,16 @@ type AppSettings struct {
 	EmbeddingDimensions   int    `json:"embedding_dimensions"`
 	EmbeddingTimeoutMS    int    `json:"embedding_timeout_ms"`
 	SemanticSearchEnabled bool   `json:"semantic_search_enabled"`
+	AboutName             string `json:"about_name"`
+	AboutTagline          string `json:"about_tagline"`
+	AboutAvatarURL        string `json:"about_avatar_url"`
+	AboutEmail            string `json:"about_email"`
+	AboutGitHubURL        string `json:"about_github_url"`
+	AboutBio              string `json:"about_bio"`
+	AboutRepoCount        string `json:"about_repo_count"`
+	AboutStarCount        string `json:"about_star_count"`
+	AboutForkCount        string `json:"about_fork_count"`
+	AboutFriendLinks      string `json:"about_friend_links"`
 }
 
 type AgentAPIKey struct {
