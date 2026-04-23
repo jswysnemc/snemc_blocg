@@ -1,0 +1,39 @@
+services:
+  blog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: snemc-blog:latest
+    container_name: snemc-blog
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      BLOG_ADDR: ":8080"
+      BLOG_SITE_URL: "http://localhost:8080"
+      BLOG_DB_PATH: "/app/data/blog.sqlite3"
+      BLOG_MEDIA_DIR: "/app/data/media"
+      BLOG_UPLOADS_DIR: "/app/data/uploads"
+      BLOG_ADMIN_USERNAME: "admin"
+      BLOG_ADMIN_PASSWORD: "ChangeMe123!"
+      # BLOG_JWT_SECRET: "change-this-before-production"
+      # BLOG_COMMENT_NOTIFY_TO: "admin@example.com"
+      # BLOG_SMTP_HOST: "smtp.example.com"
+      # BLOG_SMTP_PORT: "587"
+      # BLOG_SMTP_USERNAME: "bot@example.com"
+      # BLOG_SMTP_PASSWORD: "secret"
+      # BLOG_SMTP_FROM: "noreply@example.com"
+      # BLOG_LLM_BASE_URL: "https://api.openai.com/v1"
+      # BLOG_LLM_API_KEY: "sk-..."
+      # BLOG_LLM_MODEL: "gpt-5-mini"
+      # BLOG_EMBEDDING_BASE_URL: "https://api.openai.com/v1"
+      # BLOG_EMBEDDING_API_KEY: "sk-..."
+      # BLOG_EMBEDDING_MODEL: "text-embedding-3-small"
+      # BLOG_EMBEDDING_DIMENSIONS: "1536"
+      # BLOG_EMBEDDING_TIMEOUT_MS: "15000"
+      # BLOG_SEMANTIC_SEARCH_ENABLED: "true"
+    volumes:
+      - blog-data:/app/data
+
+volumes:
+  blog-data:

@@ -7,16 +7,17 @@ import (
 	"encoding/json"
 	"errors"
 	"html/template"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+	blogembed "github.com/snemc/snemc-blog"
 
 	"github.com/snemc/snemc-blog/internal/ai"
 	"github.com/snemc/snemc-blog/internal/auth"
@@ -42,6 +43,8 @@ type App struct {
 	settingsCache          *cache.TTLCache[store.AppSettings]
 	semanticBackfillMu     sync.Mutex
 	semanticBackfillActive bool
+	publicAssetsFS         fs.FS
+	frontendDistFS         fs.FS
 	publicJSPath           string
 	publicCSSPath          string
 }
@@ -194,22 +197,24 @@ func Run() error {
 			return template.HTML(input)
 		},
 	}
-	templates, err := template.New("").Funcs(funcs).ParseGlob(filepath.Join(root, "web", "templates", "*.gohtml"))
+	templates, err := template.New("").Funcs(funcs).ParseFS(blogembed.TemplatesFS, "*.gohtml")
 	if err != nil {
 		return err
 	}
 
 	app := &App{
-		cfg:           cfg,
-		store:         st,
-		mailer:        email.New(runtimeMailConfig(settings)),
-		reviewer:      reviewer,
-		embedder:      embedder,
-		templates:     templates,
-		postCache:     cache.New[[]store.PostSummary](),
-		searchCache:   cache.New[searchOutcome](),
-		taxonomyCache: cache.New[store.TaxonomyBundle](),
-		settingsCache: cache.New[store.AppSettings](),
+		cfg:            cfg,
+		store:          st,
+		mailer:         email.New(runtimeMailConfig(settings)),
+		reviewer:       reviewer,
+		embedder:       embedder,
+		templates:      templates,
+		postCache:      cache.New[[]store.PostSummary](),
+		searchCache:    cache.New[searchOutcome](),
+		taxonomyCache:  cache.New[store.TaxonomyBundle](),
+		settingsCache:  cache.New[store.AppSettings](),
+		publicAssetsFS: blogembed.PublicAssetsFS,
+		frontendDistFS: blogembed.FrontendDistFS,
 	}
 	app.loadEnhancementAssets()
 	app.scheduleSemanticBackfill()
@@ -230,10 +235,10 @@ func (a *App) routes() http.Handler {
 	r.Use(chimw.RealIP)
 	r.Use(chimw.Recoverer)
 
-	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.Dir(a.cfg.PublicAssetsDir))))
+	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.FS(a.publicAssetsFS))))
 	r.Handle("/media/*", immutableFileServer("/media/", a.cfg.MediaDir))
 	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir(a.cfg.UploadsDir))))
-	r.Handle("/front/*", http.StripPrefix("/front/", http.FileServer(http.Dir(a.cfg.FrontendDistDir))))
+	r.Handle("/front/*", http.StripPrefix("/front/", http.FileServer(http.FS(a.frontendDistFS))))
 
 	r.Get("/", a.handleHome)
 	r.Get("/about", a.handleAboutPage)
@@ -309,13 +314,11 @@ func (a *App) routes() http.Handler {
 }
 
 func (a *App) loadEnhancementAssets() {
-	jsPath := filepath.Join(a.cfg.FrontendDistDir, "assets", "public.js")
-	if _, err := os.Stat(jsPath); err == nil {
+	if _, err := fs.Stat(a.frontendDistFS, "assets/public.js"); err == nil {
 		a.publicJSPath = "/front/assets/public.js"
 	}
-	cssPath := filepath.Join(a.cfg.FrontendDistDir, "assets", "public.css")
-	if _, err := os.Stat(cssPath); err == nil {
-		a.publicCSSPath = "/front/assets/public.css"
+	if _, err := fs.Stat(a.frontendDistFS, "assets/public-enhance.css"); err == nil {
+		a.publicCSSPath = "/front/assets/public-enhance.css"
 	}
 }
 

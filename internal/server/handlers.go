@@ -5,9 +5,8 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -733,14 +732,15 @@ func (a *App) handleAdminDeleteComment(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleAdminApp(w http.ResponseWriter, r *http.Request) {
-	path := filepath.Join(a.cfg.FrontendDistDir, "admin.html")
-	if _, err := os.Stat(path); err != nil {
+	content, err := fs.ReadFile(a.frontendDistFS, "admin.html")
+	if err != nil {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusServiceUnavailable)
-		_, _ = w.Write([]byte("frontend not built yet, run `npm install && npm run build` in frontend/"))
+		_, _ = w.Write([]byte("embedded frontend assets unavailable, rebuild the binary after `npm run build`"))
 		return
 	}
-	http.ServeFile(w, r, path)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	http.ServeContent(w, r, "admin.html", time.Time{}, bytes.NewReader(content))
 }
 
 func (a *App) cachedPosts(ctx context.Context, key string, fetch func(context.Context) ([]store.PostSummary, error)) ([]store.PostSummary, error) {
