@@ -31,7 +31,7 @@ async function submit() {
   <div class="login-shell">
     <section class="login-card">
       <div class="login-brand">
-        <span class="login-brand-mark">S</span>
+        <img src="/logo.svg" alt="Logo" class="login-brand-mark" width="44" height="44" />
         <div>
           <h1>Snemc Blog 后台</h1>
           <p class="login-sub">登录后管理文章、评论、分类与标签</p>
@@ -63,6 +63,7 @@ async function submit() {
             html-type="submit"
             :loading="loading"
             long
+            size="medium"
           >
             登录
           </a-button>

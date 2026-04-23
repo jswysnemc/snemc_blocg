@@ -78,14 +78,17 @@ watch(
 
 <template>
   <a-config-provider :size="'small'">
-    <div v-if="!auth.ready" class="admin-loading">加载中…</div>
+    <div v-if="!auth.ready" class="admin-loading">
+      <div class="admin-loading-spinner"></div>
+      <span>加载中</span>
+    </div>
 
     <RouterView v-else-if="isPublic || !auth.isAuthenticated" />
 
     <div v-else class="admin-shell">
       <aside class="admin-sider">
         <div class="admin-brand">
-          <span class="admin-brand-mark">S</span>
+          <img src="/logo.svg" alt="Logo" class="admin-brand-mark" width="32" height="32" />
           <span class="admin-brand-text">
             <strong>Snemc Blog</strong>
             <small>Admin Console</small>
@@ -93,7 +96,6 @@ watch(
         </div>
         <div class="admin-menu-wrap">
           <a-menu
-            theme="dark"
             :selected-keys="selectedKeys"
             :style="{ background: 'transparent', border: 'none' }"
             @menu-item-click="handleMenuClick"
@@ -107,24 +109,26 @@ watch(
           </a-menu>
         </div>
         <div class="admin-user">
-          <div>
-            <strong>{{ auth.user?.username ?? "admin" }}</strong>
-            <small>Single admin</small>
+          <div class="admin-user-info">
+            <div class="admin-user-avatar">
+              {{ auth.user?.username?.[0]?.toUpperCase() ?? "A" }}
+            </div>
+            <div class="admin-user-meta">
+              <strong>{{ auth.user?.username ?? "admin" }}</strong>
+              <small>Administrator</small>
+            </div>
           </div>
           <a-button type="text" size="mini" status="danger" @click="logout">
             <template #icon><IconExport /></template>
-            退出
           </a-button>
         </div>
       </aside>
       <div class="admin-body">
         <header class="admin-topbar">
-          <span class="topbar-title">{{ pageTitle }}</span>
-          <a-space :size="12">
-            <a-button type="text" size="small">
-              <template #icon><IconApps /></template>
-              Admin
-            </a-button>
+          <div class="topbar-left">
+            <span class="topbar-title">{{ pageTitle }}</span>
+          </div>
+          <a-space :size="8">
             <a href="/" target="_blank" rel="noreferrer">
               <a-button type="text" size="small">
                 <template #icon><IconLaunch /></template>

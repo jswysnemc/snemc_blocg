@@ -5,6 +5,7 @@
   <title>{{.Title}}</title>
   <meta name="description" content="{{.Description}}" />
   <link rel="canonical" href="{{.Canonical}}" />
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
   <link rel="stylesheet" href="/assets/site.css" />
   {{if .PublicCSSPath}}<link rel="stylesheet" href="{{.PublicCSSPath}}" />{{end}}
 </head>
@@ -14,7 +15,7 @@
 <header class="site-header">
   <div class="shell header-shell">
     <a class="brand" href="/">
-      <span class="brand-mark">S</span>
+      <img src="/assets/logo.svg" alt="Logo" class="brand-mark" width="32" height="32" />
       <span class="brand-copy">
         <strong>{{.SiteName}}</strong>
         <small>Fast editorial engineering blog</small>
