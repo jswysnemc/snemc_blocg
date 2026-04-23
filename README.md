@@ -1,6 +1,6 @@
 # Snemc Blog
 
-一个可写进简历的全栈博客项目，使用 `Go + Vue3 + SQLite` 实现。
+一个全栈博客项目，使用 `Go + Vue3 + SQLite` 实现。
 
 ## Highlights
 
