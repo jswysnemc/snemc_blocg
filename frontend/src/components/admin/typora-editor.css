@@ -249,21 +249,20 @@
 }
 
 .typora-editor .pm-inline-math {
-  display: inline-flex;
-  align-items: center;
+  display: inline-block;
+  vertical-align: middle;
   margin: 0 0.15em;
   padding: 0 0.28em;
   border-radius: 6px;
   background: rgba(22, 93, 255, 0.06);
-  vertical-align: baseline;
   cursor: pointer;
   white-space: nowrap;
   word-break: normal;
-  flex-wrap: nowrap;
 }
 
 .typora-editor .pm-inline-math .katex {
   font-size: 1em;
+  white-space: nowrap;
 }
 
 .typora-editor .pm-inline-math.is-empty,

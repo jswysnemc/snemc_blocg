@@ -474,12 +474,13 @@ class CodeBlockView {
       this.paramsInput.value = node.attrs.params || "";
     }
 
-    if (!this.updating && this.textarea.value !== node.textContent) {
+    const textChanged = !this.updating && this.textarea.value !== node.textContent;
+    if (textChanged) {
       this.textarea.value = node.textContent;
+      this.renderHighlight();
+      this.adjustHeight();
     }
 
-    this.renderHighlight();
-    this.adjustHeight();
     return true;
   }
 
@@ -964,10 +965,11 @@ class MathBlockView {
     const nextParams = (node.attrs.params || "").trim().toLowerCase();
     if (nextParams !== "math") return false;
     this.node = node;
-    if (!this.updating && this.textarea.value !== node.textContent) {
+    const textChanged = !this.updating && this.textarea.value !== node.textContent;
+    if (textChanged) {
       this.textarea.value = node.textContent;
+      this.renderMath();
     }
-    this.renderMath();
     return true;
   }
 
@@ -1121,11 +1123,12 @@ class MermaidBlockView {
     const nextParams = (node.attrs.params || "").trim().toLowerCase();
     if (nextParams !== "mermaid") return false;
     this.node = node;
-    if (!this.updating && this.textarea.value !== node.textContent) {
+    const textChanged = !this.updating && this.textarea.value !== node.textContent;
+    if (textChanged) {
       this.textarea.value = node.textContent;
-    }
-    if (!this.sourceMode) {
-      this.renderMermaid();
+      if (!this.sourceMode) {
+        this.renderMermaid();
+      }
     }
     return true;
   }
