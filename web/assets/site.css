@@ -818,6 +818,11 @@ textarea {
 }
 
 /* ======================== article ======================== */
+.article-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
 .article-panel h1 {
   font-size: clamp(1.9rem, 3.2vw, 2.6rem);
 }
@@ -830,6 +835,7 @@ textarea {
   margin-top: 28px;
   border-top: 1px solid var(--line);
   padding-top: 24px;
+  min-width: 0;
 }
 
 .article-end-actions {
@@ -846,6 +852,8 @@ textarea {
   font-size: 15px;
   line-height: 1.8;
   color: var(--text);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .prose > * + * {
@@ -907,6 +915,7 @@ textarea {
   overflow: hidden;
   background: #fcfdff;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  max-width: 100%;
 }
 
 .prose .code-block pre {
@@ -1098,6 +1107,8 @@ textarea {
   border-radius: var(--radius-sm);
   overflow: hidden;
   font-size: 13px;
+  display: block;
+  overflow-x: auto;
 }
 
 .prose th {
@@ -1135,6 +1146,8 @@ textarea {
 .prose img {
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
+  max-width: 100%;
+  height: auto;
 }
 
 .article-sidebar {
