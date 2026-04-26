@@ -6,14 +6,22 @@ const VISITOR_NAME_KEY = "snemc-blog-visitor-name";
 void boot();
 
 async function boot() {
-  await initVisitor();
   initCopyLink();
-  initTrackPageView();
   initArchiveFeed();
   initSearchForms();
   initSidebarToggle();
   initTocFab();
-  await Promise.all([initArticleEnhancements(), mountWidgets()]);
+  void initVisitor()
+    .catch((error) => {
+      console.error("visitor init failed", error);
+    })
+    .finally(initTrackPageView);
+  const results = await Promise.allSettled([initArticleEnhancements(), mountWidgets()]);
+  results.forEach((result) => {
+    if (result.status === "rejected") {
+      console.error("public enhancement failed", result.reason);
+    }
+  });
 }
 
 async function mountWidgets() {
@@ -75,7 +83,7 @@ async function initVisitor() {
 function getOrCreateVisitorID() {
   let current = localStorage.getItem(VISITOR_KEY);
   if (!current) {
-    current = crypto.randomUUID();
+    current = globalThis.crypto?.randomUUID?.() ?? `visitor-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
     localStorage.setItem(VISITOR_KEY, current);
   }
   return current;
@@ -89,6 +97,13 @@ async function buildFingerprint() {
     Intl.DateTimeFormat().resolvedOptions().timeZone,
     String(navigator.hardwareConcurrency ?? ""),
   ].join("|");
+  if (!globalThis.crypto?.subtle) {
+    let hash = 5381;
+    for (let index = 0; index < raw.length; index += 1) {
+      hash = (hash * 33) ^ raw.charCodeAt(index);
+    }
+    return (hash >>> 0).toString(16).padStart(8, "0");
+  }
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
   return Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, "0"))
@@ -259,26 +274,46 @@ function initTocFab() {
   const fab = document.querySelector<HTMLButtonElement>("[data-toc-fab]");
   const sidebar = document.querySelector<HTMLElement>("[data-toc-sidebar]");
   const closeBtn = document.querySelector<HTMLButtonElement>("[data-toc-close]");
-  if (!fab || !sidebar || !closeBtn) {
+  const toc = document.querySelector<HTMLElement>("[data-toc]");
+  if (!fab || !sidebar || !closeBtn || !toc) {
     return;
   }
 
-  const openToc = () => {
-    sidebar.classList.add("is-open");
-    fab.classList.add("is-active");
+  let hasToc = false;
+  try {
+    const items = JSON.parse(toc.dataset.toc ?? "[]") as unknown[];
+    hasToc = items.length > 0;
+  } catch {
+    hasToc = false;
+  }
+  if (!hasToc) {
+    hasToc = Boolean(document.querySelector("#article-content h2, #article-content h3, #article-content h4"));
+  }
+  if (!hasToc) {
+    fab.hidden = true;
+    return;
+  }
+
+  const setExpanded = (expanded: boolean) => {
+    sidebar.classList.toggle("is-open", expanded);
+    fab.classList.toggle("is-active", expanded);
+    fab.setAttribute("aria-expanded", String(expanded));
   };
 
-  const closeToc = () => {
-    sidebar.classList.remove("is-open");
-    fab.classList.remove("is-active");
-  };
+  const closeToc = () => setExpanded(false);
 
-  fab.addEventListener("click", openToc);
+  fab.addEventListener("click", () => {
+    setExpanded(!sidebar.classList.contains("is-open"));
+  });
   closeBtn.addEventListener("click", closeToc);
 
-  // 点击遮罩关闭
-  sidebar.addEventListener("click", (e) => {
-    if (e.target === sidebar) {
+  sidebar.addEventListener("click", (event) => {
+    if (event.target instanceof HTMLAnchorElement) {
+      closeToc();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
       closeToc();
     }
   });

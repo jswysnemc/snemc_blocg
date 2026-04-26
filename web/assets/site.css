@@ -360,6 +360,15 @@ textarea {
   gap: 16px;
 }
 
+.sidebar-toggle {
+  display: none;
+}
+
+.sidebar-content {
+  display: grid;
+  gap: 16px;
+}
+
 .sidebar-card {
   padding: 20px;
 }
@@ -1095,13 +1104,13 @@ textarea {
 
 .prose table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   overflow: hidden;
   font-size: 13px;
-  display: block;
-  overflow-x: auto;
+  table-layout: auto;
 }
 
 .prose th {
@@ -1112,8 +1121,13 @@ textarea {
 .prose th,
 .prose td {
   padding: 8px 12px;
+  border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  text-align: left;
+  text-align: center;
+}
+
+.prose tr > :last-child {
+  border-right: 0;
 }
 
 .prose th[align="center"],
@@ -1150,6 +1164,15 @@ textarea {
   gap: 14px;
   max-height: calc(100vh - 88px);
   overflow-y: auto;
+}
+
+.toc-fab,
+.toc-close {
+  display: none;
+}
+
+.toc-fab[hidden] {
+  display: none;
 }
 
 .toc-list {
@@ -1660,6 +1683,12 @@ textarea {
     justify-self: stretch;
   }
 
+  .prose table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
   /* 可折叠侧边栏 */
   .sidebar-panel {
     position: relative;
@@ -1736,11 +1765,11 @@ textarea {
   /* 文章目录悬浮按钮 */
   .article-sidebar {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
+    top: calc(64px + env(safe-area-inset-top));
+    left: 12px;
     z-index: 40;
-    max-width: 320px;
-    max-height: 70vh;
+    width: min(320px, calc(100vw - 24px));
+    max-height: min(72vh, calc(100vh - 92px));
     overflow-y: auto;
     background: var(--surface);
     border: 1px solid var(--line);
@@ -1757,11 +1786,11 @@ textarea {
 
   .toc-fab {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
+    top: calc(64px + env(safe-area-inset-top));
+    left: 12px;
     z-index: 50;
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
     border-radius: 999px;
     background: var(--primary);
     color: #fff;
@@ -1784,8 +1813,8 @@ textarea {
   }
 
   .toc-fab svg {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
   }
 
   .toc-fab.is-active {

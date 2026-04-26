@@ -240,6 +240,9 @@ func (a *App) routes() http.Handler {
 	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir(a.cfg.UploadsDir))))
 	r.Handle("/front/*", http.StripPrefix("/front/", http.FileServer(http.FS(a.frontendDistFS))))
 
+	r.Get("/h/{route_id}", a.handleStaticSite)
+	r.Get("/h/{route_id}/*", a.handleStaticSite)
+
 	r.Get("/", a.handleHome)
 	r.Get("/about", a.handleAboutPage)
 	r.Get("/archive", a.handleArchivePage)
@@ -284,6 +287,13 @@ func (a *App) routes() http.Handler {
 		admin.With(a.requireAdmin).Get("/api/admin/agent-keys", a.handleAdminAgentKeys)
 		admin.With(a.requireAdmin).Post("/api/admin/agent-keys", a.handleAdminCreateAgentKey)
 		admin.With(a.requireAdmin).Delete("/api/admin/agent-keys/{id}", a.handleAdminRevokeAgentKey)
+		admin.With(a.requireAdmin).Get("/api/admin/media/assets", a.handleAdminMediaAssets)
+		admin.With(a.requireAdmin).Delete("/api/admin/media/assets", a.handleAdminMediaAssetDelete)
+		admin.With(a.requireAdmin).Get("/api/admin/static-sites", a.handleAdminStaticSites)
+		admin.With(a.requireAdmin).Post("/api/admin/static-sites", a.handleAdminCreateStaticSite)
+		admin.With(a.requireAdmin).Post("/api/admin/static-sites/{id}/upload", a.handleAdminUploadStaticSite)
+		admin.With(a.requireAdmin).Get("/api/admin/static-sites/{id}/download", a.handleAdminDownloadStaticSite)
+		admin.With(a.requireAdmin).Delete("/api/admin/static-sites/{id}", a.handleAdminDeleteStaticSite)
 		admin.With(a.requireAdmin).Post("/api/admin/media/images", a.handleAdminMediaImageUpload)
 		admin.With(a.requireAdmin).Post("/api/admin/media/import", a.handleAdminMediaImport)
 		admin.With(a.requireAdmin).Post("/api/admin/upload/image", a.handleAdminImageUpload)

@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -40,6 +42,18 @@ type storedMediaAsset struct {
 	Size        int
 }
 
+type mediaAssetInfo struct {
+	Name        string `json:"name"`
+	Path        string `json:"path"`
+	URL         string `json:"url"`
+	MarkdownURL string `json:"markdown_url"`
+	ContentType string `json:"content_type"`
+	Width       int    `json:"width"`
+	Height      int    `json:"height"`
+	Size        int64  `json:"size"`
+	ModifiedAt  string `json:"modified_at"`
+}
+
 func immutableFileServer(prefix string, root string) http.Handler {
 	fileServer := http.StripPrefix(prefix, http.FileServer(http.Dir(root)))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +64,50 @@ func immutableFileServer(prefix string, root string) http.Handler {
 
 func (a *App) handleAdminImageUpload(w http.ResponseWriter, r *http.Request) {
 	a.handleAdminMediaImageUpload(w, r)
+}
+
+func (a *App) handleAdminMediaAssets(w http.ResponseWriter, r *http.Request) {
+	assets, err := a.listManagedMediaAssets()
+	if err != nil {
+		a.respondJSON(w, http.StatusInternalServerError, map[string]any{
+			"msg":  "failed to list media assets",
+			"code": -1,
+		})
+		return
+	}
+
+	a.respondJSON(w, http.StatusOK, map[string]any{
+		"assets": assets,
+	})
+}
+
+func (a *App) handleAdminMediaAssetDelete(w http.ResponseWriter, r *http.Request) {
+	relativePath, err := cleanManagedMediaPath(r.URL.Query().Get("path"))
+	if err != nil {
+		a.respondJSON(w, http.StatusBadRequest, map[string]any{
+			"msg":  err.Error(),
+			"code": -1,
+		})
+		return
+	}
+
+	fullPath := filepath.Join(a.cfg.MediaDir, relativePath)
+	if err := os.Remove(fullPath); err != nil {
+		status := http.StatusInternalServerError
+		message := "failed to delete media asset"
+		if errors.Is(err, os.ErrNotExist) {
+			status = http.StatusNotFound
+			message = "media asset not found"
+		}
+		a.respondJSON(w, status, map[string]any{
+			"msg":  message,
+			"code": -1,
+		})
+		return
+	}
+
+	a.removeEmptyMediaParents(filepath.Dir(relativePath))
+	a.respondJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (a *App) handleAdminMediaImageUpload(w http.ResponseWriter, r *http.Request) {
@@ -164,6 +222,122 @@ func (a *App) handleAdminMediaImport(w http.ResponseWriter, r *http.Request) {
 			"size":         asset.Size,
 		},
 	})
+}
+
+func (a *App) listManagedMediaAssets() ([]mediaAssetInfo, error) {
+	assets := make([]mediaAssetInfo, 0)
+
+	err := filepath.WalkDir(a.cfg.MediaDir, func(fullPath string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+
+		relativePath, err := filepath.Rel(a.cfg.MediaDir, fullPath)
+		if err != nil {
+			return err
+		}
+		relativePath = filepath.ToSlash(relativePath)
+
+		width, height := imageDimensions(fullPath)
+		cleanURL := "/media/" + relativePath
+		assets = append(assets, mediaAssetInfo{
+			Name:        filepath.Base(relativePath),
+			Path:        relativePath,
+			URL:         cleanURL,
+			MarkdownURL: buildMarkdownMediaURL(cleanURL, width, height),
+			ContentType: mediaContentTypeFromExt(relativePath),
+			Width:       width,
+			Height:      height,
+			Size:        info.Size(),
+			ModifiedAt:  info.ModTime().Format(time.RFC3339),
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(assets, func(i, j int) bool {
+		return assets[i].ModifiedAt > assets[j].ModifiedAt
+	})
+	return assets, nil
+}
+
+func imageDimensions(fullPath string) (int, int) {
+	file, err := os.Open(fullPath)
+	if err != nil {
+		return 0, 0
+	}
+	defer file.Close()
+
+	cfg, _, err := image.DecodeConfig(file)
+	if err != nil {
+		return 0, 0
+	}
+	return cfg.Width, cfg.Height
+}
+
+func mediaContentTypeFromExt(name string) string {
+	if contentType := contentTypeFromName(name); contentType != "" {
+		return contentType
+	}
+	return "application/octet-stream"
+}
+
+func contentTypeFromName(name string) string {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".png":
+		return "image/png"
+	case ".gif":
+		return "image/gif"
+	case ".webp":
+		return "image/webp"
+	default:
+		return mime.TypeByExtension(filepath.Ext(name))
+	}
+}
+
+func cleanManagedMediaPath(raw string) (string, error) {
+	value := filepath.ToSlash(strings.TrimSpace(raw))
+	if value == "" {
+		return "", fmt.Errorf("missing media path")
+	}
+	if strings.HasPrefix(value, "/media/") {
+		value = strings.TrimPrefix(value, "/media/")
+	}
+	if strings.Contains(value, "?") {
+		value = strings.SplitN(value, "?", 2)[0]
+	}
+	cleaned := path.Clean("/" + value)
+	cleaned = strings.TrimPrefix(cleaned, "/")
+	if cleaned == "." || cleaned == "" || strings.HasPrefix(cleaned, "../") || strings.Contains(cleaned, "/../") {
+		return "", fmt.Errorf("invalid media path")
+	}
+	if path.Base(cleaned) == "." || path.Base(cleaned) == "/" {
+		return "", fmt.Errorf("invalid media path")
+	}
+	return filepath.FromSlash(cleaned), nil
+}
+
+func (a *App) removeEmptyMediaParents(relativeDir string) {
+	dir := filepath.Clean(relativeDir)
+	for dir != "." && dir != string(filepath.Separator) && dir != "" {
+		fullDir := filepath.Join(a.cfg.MediaDir, dir)
+		if err := os.Remove(fullDir); err != nil {
+			return
+		}
+		dir = filepath.Dir(dir)
+	}
 }
 
 func (a *App) importManagedImage(ctx context.Context, rawURL string) (storedMediaAsset, error) {

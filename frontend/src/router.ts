@@ -44,6 +44,11 @@ const router = createRouter({
       component: () => import("./views/TaxonomyView.vue"),
     },
     {
+      path: "/assets",
+      name: "assets",
+      component: () => import("./views/MediaAssetsView.vue"),
+    },
+    {
       path: "/settings",
       name: "settings",
       component: () => import("./views/SettingsView.vue"),

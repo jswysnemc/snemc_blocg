@@ -24,6 +24,7 @@ const menuItems = [
   { key: "/posts", label: "文章管理", icon: IconFile },
   { key: "/comments", label: "评论审核", icon: IconMessage },
   { key: "/taxonomies", label: "分类与标签", icon: IconTags },
+  { key: "/assets", label: "静态资源", icon: IconApps },
   { key: "/settings", label: "系统设置", icon: IconSettings },
 ];
 

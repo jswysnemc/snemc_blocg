@@ -177,6 +177,18 @@ type AgentAPIKey struct {
 	RevokedAt  *time.Time `json:"revoked_at"`
 }
 
+type StaticSite struct {
+	ID           int64     `json:"id"`
+	RouteID      string    `json:"route_id"`
+	EntryPath    string    `json:"entry_path"`
+	StorageMode  string    `json:"storage_mode"`
+	DownloadName string    `json:"download_name"`
+	FileCount    int       `json:"file_count"`
+	TotalSize    int64     `json:"total_size"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 type MentionTarget struct {
 	VisitorID   string `json:"visitor_id"`
 	DisplayName string `json:"display_name"`

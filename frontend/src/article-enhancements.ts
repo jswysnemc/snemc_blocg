@@ -2,6 +2,13 @@ import renderMathInElement from "katex/contrib/auto-render";
 import "katex/dist/katex.min.css";
 import "./public-enhance.css";
 
+type TocItem = {
+  id: string;
+  text: string;
+  level: number;
+  preview: string;
+};
+
 export async function enhanceArticle(root: HTMLElement) {
   renderMathInElement(root, {
     delimiters: [
@@ -105,11 +112,20 @@ function initTOC(root: HTMLElement) {
   const preview = document.querySelector<HTMLElement>("[data-toc-preview]");
   try {
     const toc = JSON.parse(target.dataset.toc ?? "[]") as Array<{ id: string; text: string; level: number }>;
-    const items = toc
-      .map((item) => ({
-        ...item,
-        preview: extractSectionPreview(root.querySelector<HTMLElement>(`#${CSS.escape(item.id)}`), item.text),
-      }));
+    const sourceItems = toc.length > 0 ? toc : collectHeadings(root);
+    const items: TocItem[] = sourceItems
+      .map((item) => {
+        const heading = root.querySelector<HTMLElement>(`#${CSS.escape(item.id)}`);
+        return {
+          ...item,
+          preview: extractSectionPreview(heading, item.text),
+        };
+      });
+
+    if (items.length === 0) {
+      target.innerHTML = "";
+      return;
+    }
 
     target.innerHTML = items
       .map((item) => `<a href="#${item.id}" data-id="${item.id}" title="${escapeHTML(item.preview)}" style="padding-left:${(item.level - 2) * 14}px">${escapeHTML(item.text)}</a>`)
@@ -167,6 +183,44 @@ function initTOC(root: HTMLElement) {
   } catch {
     target.innerHTML = "";
   }
+}
+
+function collectHeadings(root: HTMLElement) {
+  const used = new Set<string>();
+  return Array.from(root.querySelectorAll<HTMLElement>("h2, h3, h4"))
+    .map((heading) => {
+      const text = heading.textContent?.trim() ?? "";
+      if (!text) {
+        return null;
+      }
+      const level = Number(heading.tagName.slice(1));
+      const id = ensureHeadingID(heading, text, used);
+      return { id, text, level };
+    })
+    .filter((item): item is { id: string; text: string; level: number } => Boolean(item));
+}
+
+function ensureHeadingID(heading: HTMLElement, text: string, used: Set<string>) {
+  const existing = heading.id.trim();
+  const base = existing || slugifyHeading(text) || "section";
+  let id = base;
+  let index = 2;
+  while (used.has(id) || (document.getElementById(id) && document.getElementById(id) !== heading)) {
+    id = `${base}-${index}`;
+    index += 1;
+  }
+  used.add(id);
+  heading.id = id;
+  return id;
+}
+
+function slugifyHeading(text: string) {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^\p{L}\p{N}_-]+/gu, "")
+    .replace(/^-+|-+$/g, "");
 }
 
 function extractSectionPreview(heading: HTMLElement | null, fallback: string) {

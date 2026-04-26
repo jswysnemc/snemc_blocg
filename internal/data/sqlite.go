@@ -227,6 +227,17 @@ func migrate(db *sql.DB) error {
 				last_used_at TEXT,
 				revoked_at TEXT
 			);`,
+		`CREATE TABLE IF NOT EXISTS static_sites (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				route_id TEXT NOT NULL UNIQUE,
+				entry_path TEXT NOT NULL DEFAULT '',
+				storage_mode TEXT NOT NULL DEFAULT 'empty',
+				download_name TEXT NOT NULL DEFAULT '',
+				file_count INTEGER NOT NULL DEFAULT 0,
+				total_size INTEGER NOT NULL DEFAULT 0,
+				created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+			);`,
 		`CREATE VIRTUAL TABLE IF NOT EXISTS post_fts USING fts5(
 				post_id UNINDEXED,
 				title,
@@ -243,6 +254,8 @@ func migrate(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_comment_review_tokens_comment_expires_at ON comment_review_tokens(comment_id, expires_at);`,
 		`CREATE INDEX IF NOT EXISTS idx_mention_notifications_comment_status ON mention_notifications(comment_id, delivery_status);`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_api_keys_prefix ON agent_api_keys(key_prefix);`,
+		`CREATE INDEX IF NOT EXISTS idx_static_sites_route_id ON static_sites(route_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_static_sites_updated_at ON static_sites(updated_at DESC);`,
 	}
 
 	for _, stmt := range statements {

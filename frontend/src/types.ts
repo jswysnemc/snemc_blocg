@@ -115,3 +115,15 @@ export interface AgentAPIKey {
   last_used_at: string | null;
   revoked_at: string | null;
 }
+
+export interface StaticSite {
+  id: number;
+  route_id: string;
+  entry_path: string;
+  storage_mode: string;
+  download_name: string;
+  file_count: number;
+  total_size: number;
+  created_at: string;
+  updated_at: string;
+}

@@ -48,6 +48,7 @@ import {
   addColumnBefore,
   addRowAfter,
   addRowBefore,
+  CellSelection,
   columnResizing,
   deleteColumn,
   deleteRow,
@@ -55,6 +56,7 @@ import {
   fixTables,
   goToNextCell,
   isInTable,
+  selectedRect,
   tableEditing,
   tableNodes,
   TableView,
@@ -460,6 +462,12 @@ class CodeBlockView {
     this.view = editorView;
     this.getPos = getPos;
     this.updating = false;
+    this.selectionFrame = 0;
+    this.handleSelectionChange = () => {
+      if (this.textarea?.ownerDocument.activeElement === this.textarea) {
+        this.queueSelectionRefresh();
+      }
+    };
 
     this.dom = document.createElement("section");
     this.dom.className = "pm-code-block";
@@ -467,23 +475,28 @@ class CodeBlockView {
     this.header = document.createElement("div");
     this.header.className = "code-block-header";
 
+    this.languageLabel = document.createElement("span");
+    this.languageLabel.className = "code-block-language";
+
     this.fenceLabel = document.createElement("span");
-    this.fenceLabel.className = "code-fence-label";
-    this.fenceLabel.textContent = "```";
+    this.fenceLabel.className = "code-block-icon";
+    this.fenceLabel.textContent = "</>";
 
     this.paramsInput = document.createElement("input");
-    this.paramsInput.className = "code-language-input";
+    this.paramsInput.className = "code-block-language-text code-language-input";
     this.paramsInput.type = "text";
     this.paramsInput.autocomplete = "off";
     this.paramsInput.spellcheck = false;
-    this.paramsInput.placeholder = "language";
+    this.paramsInput.placeholder = "Text";
+    this.paramsInput.setAttribute("aria-label", "代码块语言类型");
     this.paramsInput.value = node.attrs.params || "";
 
     this.headerHint = document.createElement("span");
     this.headerHint.className = "code-header-hint";
     this.headerHint.textContent = "Tab 缩进 / Ctrl+Enter 退出";
 
-    this.header.append(this.fenceLabel, this.paramsInput, this.headerHint);
+    this.languageLabel.append(this.fenceLabel, this.paramsInput);
+    this.header.append(this.languageLabel, this.headerHint);
 
     this.surface = document.createElement("div");
     this.surface.className = "code-surface";
@@ -509,7 +522,10 @@ class CodeBlockView {
     this.surface.append(this.highlight, this.textarea);
     this.dom.append(this.header, this.surface);
 
-    this.paramsInput.addEventListener("input", () => this.updateParams());
+    this.paramsInput.addEventListener("input", () => {
+      this.updateParams();
+      this.renderHighlight();
+    });
     this.paramsInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
@@ -530,7 +546,15 @@ class CodeBlockView {
     this.textarea.addEventListener("click", () => this.forwardSelection());
     this.textarea.addEventListener("keyup", () => this.forwardSelection());
     this.textarea.addEventListener("select", () => this.forwardSelection());
+    this.textarea.addEventListener("pointerdown", () => this.queueSelectionRefresh());
+    this.textarea.addEventListener("pointermove", (event) => {
+      if (event.buttons > 0) {
+        this.queueSelectionRefresh();
+      }
+    });
+    this.textarea.addEventListener("pointerup", () => this.queueSelectionRefresh());
     this.textarea.addEventListener("keydown", (event) => this.handleKeydown(event));
+    this.textarea.ownerDocument.addEventListener("selectionchange", this.handleSelectionChange);
 
     this.renderHighlight();
     this.adjustHeight();
@@ -590,6 +614,11 @@ class CodeBlockView {
   }
 
   destroy() {
+    if (this.selectionFrame) {
+      cancelAnimationFrame(this.selectionFrame);
+      this.selectionFrame = 0;
+    }
+    this.textarea.ownerDocument.removeEventListener("selectionchange", this.handleSelectionChange);
     codeBlockViews.delete(this);
   }
 
@@ -617,6 +646,16 @@ class CodeBlockView {
     const cursorOffset = this.indentChar.length;
     this.textarea.selectionStart = selectionStart + cursorOffset;
     this.textarea.selectionEnd = selectionEnd + cursorOffset * lines.length;
+  }
+
+  insertIndentAtCursor() {
+    const value = this.textarea.value;
+    const position = this.textarea.selectionStart;
+    const nextPosition = position + this.indentChar.length;
+
+    this.textarea.value = value.slice(0, position) + this.indentChar + value.slice(position);
+    this.textarea.selectionStart = nextPosition;
+    this.textarea.selectionEnd = nextPosition;
   }
 
   outdentLines() {
@@ -742,6 +781,19 @@ class CodeBlockView {
     this.view.dispatch(this.view.state.tr.setSelection(TextSelection.create(this.view.state.doc, from, to)));
   }
 
+  queueSelectionRefresh() {
+    if (this.selectionFrame) {
+      return;
+    }
+
+    this.selectionFrame = requestAnimationFrame(() => {
+      this.selectionFrame = 0;
+      if (this.textarea.ownerDocument.activeElement === this.textarea) {
+        this.forwardSelection();
+      }
+    });
+  }
+
   handleKeydown(event) {
     if ((event.key === "Backspace" || event.key === "Delete") && this.textarea.value.length === 0) {
       event.preventDefault();
@@ -757,10 +809,13 @@ class CodeBlockView {
 
     if (event.key === "Tab") {
       event.preventDefault();
+      const hasSelection = this.textarea.selectionStart !== this.textarea.selectionEnd;
       if (event.shiftKey) {
         this.outdentLines();
-      } else {
+      } else if (hasSelection) {
         this.indentLines();
+      } else {
+        this.insertIndentAtCursor();
       }
       this.renderHighlight();
       this.adjustHeight();
@@ -874,6 +929,7 @@ class CodeBlockView {
 
     this.dom.dataset.language = params || "plain text";
     this.surface.dataset.empty = content.length === 0 ? "true" : "false";
+    this.fenceLabel.textContent = resolveLanguageMeta(params).icon;
 
     if (!language || !Prism.languages[language]) {
       this.code.innerHTML = renderSelectedPlainText(content, selectionStart, selectionEnd) || "<span class=\"token plain\"> </span>";
@@ -2668,6 +2724,40 @@ function resolveLanguage(params) {
   return LANGUAGE_ALIASES[first] || first;
 }
 
+function resolveLanguageMeta(params) {
+  const key = params.trim().split(/\s+/)[0].toLowerCase();
+  const map = {
+    go: { icon: "" },
+    js: { icon: "" },
+    javascript: { icon: "" },
+    ts: { icon: "" },
+    typescript: { icon: "" },
+    py: { icon: "" },
+    python: { icon: "" },
+    rb: { icon: "" },
+    ruby: { icon: "" },
+    rs: { icon: "" },
+    rust: { icon: "" },
+    sh: { icon: "" },
+    bash: { icon: "" },
+    zsh: { icon: "" },
+    shell: { icon: "" },
+    md: { icon: "" },
+    markdown: { icon: "" },
+    yml: { icon: "" },
+    yaml: { icon: "" },
+    json: { icon: "" },
+    sql: { icon: "" },
+    html: { icon: "" },
+    xml: { icon: "" },
+    svg: { icon: "" },
+    css: { icon: "" },
+    vue: { icon: "" },
+  };
+
+  return map[key] || { icon: "󰆍" };
+}
+
 function escapeHtml(text) {
   return text
     .replaceAll("&", "&amp;")
@@ -2770,6 +2860,26 @@ function addTableRowOnModEnter(state, dispatch, view) {
   return addRowAfter(state, dispatch, view);
 }
 
+function deleteSelectedTableRowsOrTable(state, dispatch, view) {
+  if (!(state.selection instanceof CellSelection) || !isInTable(state)) {
+    return false;
+  }
+
+  const rect = selectedRect(state);
+  const selectsFullWidth = rect.left === 0 && rect.right === rect.map.width;
+  const selectsFullHeight = rect.top === 0 && rect.bottom === rect.map.height;
+
+  if (selectsFullWidth && selectsFullHeight) {
+    return deleteTable(state, dispatch, view);
+  }
+
+  if (selectsFullWidth) {
+    return deleteRow(state, dispatch, view);
+  }
+
+  return false;
+}
+
 function deleteLineWhenFullySelected(state, dispatch) {
   if (state.selection.empty) return false;
 
@@ -2809,8 +2919,8 @@ function createState(markdown) {
         ArrowUp: arrowHandler("up"),
         ArrowDown: arrowHandler("down"),
         "Mod-Enter": addTableRowOnModEnter,
-        Backspace: deleteLineWhenFullySelected,
-        Delete: deleteLineWhenFullySelected,
+        Backspace: chainCommands(deleteSelectedTableRowsOrTable, deleteLineWhenFullySelected),
+        Delete: chainCommands(deleteSelectedTableRowsOrTable, deleteLineWhenFullySelected),
       }),
       columnResizing(),
       tableEditing(),

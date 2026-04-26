@@ -40,6 +40,7 @@ let dragOverHandler: ((event: DragEvent) => void) | null = null;
 let dropHandler: ((event: DragEvent) => void) | null = null;
 let scrollHandler: (() => void) | null = null;
 let focusOutHandler: ((event: FocusEvent) => void) | null = null;
+let modeShortcutHandler: ((event: KeyboardEvent) => void) | null = null;
 
 const commandGroups = [
   [
@@ -139,6 +140,22 @@ async function toggleEditorMode() {
   syncSourceMeta(markdown);
   await nextTick();
   sourceTextarea.value?.focus();
+}
+
+function isModeShortcut(event: KeyboardEvent) {
+  return (event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && (event.key === "/" || event.code === "Slash");
+}
+
+function handleModeShortcut(event: KeyboardEvent) {
+  if (!isModeShortcut(event)) {
+    return;
+  }
+  const target = event.target instanceof Element ? event.target : null;
+  if (target && !target.closest(".typora-editor")) {
+    return;
+  }
+  event.preventDefault();
+  void toggleEditorMode();
 }
 
 function handleSourceInput(event: Event) {
@@ -364,6 +381,8 @@ onMounted(() => {
   editorHost.value.addEventListener("drop", dropHandler);
   editorHost.value.addEventListener("scroll", scrollHandler, { passive: true });
   editorHost.value.addEventListener("focusout", focusOutHandler);
+  modeShortcutHandler = handleModeShortcut;
+  window.addEventListener("keydown", modeShortcutHandler);
   scrollHandler();
 });
 
@@ -399,6 +418,9 @@ onBeforeUnmount(() => {
   if (editorHost.value && focusOutHandler) {
     editorHost.value.removeEventListener("focusout", focusOutHandler);
   }
+  if (modeShortcutHandler) {
+    window.removeEventListener("keydown", modeShortcutHandler);
+  }
   editor?.flushPendingSync();
   editor?.destroy();
 });
@@ -407,7 +429,11 @@ onBeforeUnmount(() => {
 <template>
   <section class="typora-editor">
     <div class="typora-toolbar" @pointerdown="preventToolbarBlur">
-      <template v-for="(group, groupIndex) in commandGroups" :key="groupIndex">
+      <div
+        v-for="(group, groupIndex) in commandGroups"
+        :key="groupIndex"
+        class="typora-toolbar-group"
+      >
         <button
           v-for="command in group"
           :key="command.key"
@@ -419,39 +445,33 @@ onBeforeUnmount(() => {
         >
           {{ command.label }}
         </button>
-        <span
-          v-if="groupIndex < commandGroups.length - 1"
-          :key="`divider-${groupIndex}`"
-          class="typora-toolbar-divider"
-        ></span>
-      </template>
+      </div>
 
-      <span class="typora-toolbar-divider"></span>
+      <div class="typora-toolbar-group typora-toolbar-group-secondary">
+        <button
+          type="button"
+          class="typora-tool secondary"
+          :data-active="sourceMode ? 'true' : 'false'"
+          title="Ctrl+/ 切换源码模式"
+          @click="toggleEditorMode"
+        >
+          {{ sourceMode ? "排版模式" : "源码模式" }}
+        </button>
+        <button type="button" class="typora-tool secondary" @click="openImagePicker">
+          图片
+        </button>
+        <button type="button" class="typora-tool secondary" @click="insertRemoteImage">
+          远程图
+        </button>
+        <button type="button" class="typora-tool secondary" @click="copyMarkdown">
+          复制 Markdown
+        </button>
+        <button type="button" class="typora-tool secondary" @click="downloadMarkdown">
+          导出 .md
+        </button>
+      </div>
 
-      <button
-        type="button"
-        class="typora-tool secondary"
-        :data-active="sourceMode ? 'true' : 'false'"
-        @click="toggleEditorMode"
-      >
-        {{ sourceMode ? "排版模式" : "源码模式" }}
-      </button>
-      <button type="button" class="typora-tool secondary" @click="openImagePicker">
-        图片
-      </button>
-      <button type="button" class="typora-tool secondary" @click="insertRemoteImage">
-        远程图
-      </button>
-      <button type="button" class="typora-tool secondary" @click="copyMarkdown">
-        复制 Markdown
-      </button>
-      <button type="button" class="typora-tool secondary" @click="downloadMarkdown">
-        导出 .md
-      </button>
-    </div>
-
-    <div class="typora-editor-card">
-      <div class="typora-editor-meta" @pointerdown="preventToolbarBlur">
+      <div class="typora-toolbar-meta">
         <div class="typora-meta-readout">
           <span>{{ statusText }}</span>
           <span>{{ statsText }}</span>
@@ -462,13 +482,16 @@ onBeforeUnmount(() => {
             v-for="command in tableCommands"
             :key="command.key"
             type="button"
+            :data-danger="command.key.startsWith('delete') ? 'true' : 'false'"
             @click="runTableCommand(command.key)"
           >
             {{ command.label }}
           </button>
         </div>
       </div>
+    </div>
 
+    <div class="typora-editor-card">
       <div v-show="!sourceMode" ref="editorHost" class="editor-host prose"></div>
       <textarea
         v-show="sourceMode"
