@@ -11,6 +11,7 @@ async function boot() {
   initTrackPageView();
   initArchiveFeed();
   initSearchForms();
+  initSidebarToggle();
   await Promise.all([initArticleEnhancements(), mountWidgets()]);
 }
 
@@ -236,6 +237,20 @@ function initSearchForms() {
         submit.textContent = idleLabel;
       }, 12000);
     });
+  });
+}
+
+function initSidebarToggle() {
+  const toggle = document.querySelector<HTMLButtonElement>(".sidebar-toggle");
+  const content = document.getElementById("sidebar-content");
+  if (!toggle || !content) {
+    return;
+  }
+
+  toggle.addEventListener("click", () => {
+    const isExpanded = toggle.getAttribute("aria-expanded") === "true";
+    toggle.setAttribute("aria-expanded", String(!isExpanded));
+    content.classList.toggle("is-open");
   });
 }
 

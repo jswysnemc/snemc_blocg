@@ -1534,21 +1534,53 @@ textarea {
   }
 
   .site-header {
-    position: static;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom: 1px solid var(--line);
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    padding: 8px 0;
   }
 
   .header-shell {
-    gap: 12px;
+    gap: 8px;
     grid-template-columns: 1fr auto;
+    padding: 0;
+  }
+
+  .brand {
+    gap: 8px;
+  }
+
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+  }
+
+  .brand-copy strong {
+    font-size: 13px;
+  }
+
+  .brand-copy small {
+    display: none;
   }
 
   .header-search {
     grid-column: 1 / -1;
+    display: none;
   }
 
   .top-nav {
     justify-self: end;
     flex-wrap: wrap;
+    gap: 0;
+  }
+
+  .top-nav a {
+    padding: 4px 8px;
+    font-size: 12px;
   }
 
   .home-grid {
@@ -1620,6 +1652,79 @@ textarea {
   .search-mode-switch {
     grid-column: auto;
     justify-self: stretch;
+  }
+
+  /* 可折叠侧边栏 */
+  .sidebar-panel {
+    position: relative;
+  }
+
+  .sidebar-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    transition: background 180ms ease, border-color 180ms ease;
+  }
+
+  .sidebar-toggle:hover {
+    background: var(--surface-subtle);
+    border-color: var(--line-strong);
+  }
+
+  .sidebar-toggle-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    transition: transform 200ms ease;
+  }
+
+  .sidebar-toggle-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-icon {
+    transform: rotate(180deg);
+  }
+
+  .sidebar-content {
+    display: none;
+    margin-top: 12px;
+    animation: sidebar-slide-down 200ms ease;
+  }
+
+  .sidebar-content.is-open {
+    display: block;
+  }
+
+  @keyframes sidebar-slide-down {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .sidebar-content .sidebar-card {
+    margin-bottom: 12px;
+  }
+
+  .sidebar-content .sidebar-card:last-child {
+    margin-bottom: 0;
   }
 }
 
