@@ -12,6 +12,7 @@ async function boot() {
   initArchiveFeed();
   initSearchForms();
   initSidebarToggle();
+  initTocFab();
   await Promise.all([initArticleEnhancements(), mountWidgets()]);
 }
 
@@ -251,6 +252,35 @@ function initSidebarToggle() {
     const isExpanded = toggle.getAttribute("aria-expanded") === "true";
     toggle.setAttribute("aria-expanded", String(!isExpanded));
     content.classList.toggle("is-open");
+  });
+}
+
+function initTocFab() {
+  const fab = document.querySelector<HTMLButtonElement>("[data-toc-fab]");
+  const sidebar = document.querySelector<HTMLElement>("[data-toc-sidebar]");
+  const closeBtn = document.querySelector<HTMLButtonElement>("[data-toc-close]");
+  if (!fab || !sidebar || !closeBtn) {
+    return;
+  }
+
+  const openToc = () => {
+    sidebar.classList.add("is-open");
+    fab.classList.add("is-active");
+  };
+
+  const closeToc = () => {
+    sidebar.classList.remove("is-open");
+    fab.classList.remove("is-active");
+  };
+
+  fab.addEventListener("click", openToc);
+  closeBtn.addEventListener("click", closeToc);
+
+  // 点击遮罩关闭
+  sidebar.addEventListener("click", (e) => {
+    if (e.target === sidebar) {
+      closeToc();
+    }
   });
 }
 

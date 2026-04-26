@@ -38,12 +38,27 @@
       </section>
     </article>
 
-    <aside class="article-sidebar">
+    <button class="toc-fab" aria-label="打开目录" data-toc-fab>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="8" y1="6" x2="21" y2="6"></line>
+        <line x1="8" y1="12" x2="21" y2="12"></line>
+        <line x1="8" y1="18" x2="21" y2="18"></line>
+        <line x1="3" y1="6" x2="3.01" y2="6"></line>
+        <line x1="3" y1="12" x2="3.01" y2="12"></line>
+        <line x1="3" y1="18" x2="3.01" y2="18"></line>
+      </svg>
+    </button>
+    <aside class="article-sidebar" data-toc-sidebar>
+      <div class="toc-close">
+        <span>目录</span>
+        <button class="toc-close-btn" aria-label="关闭目录" data-toc-close>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
       <section class="sidebar-card">
-        <div class="section-heading compact">
-          <span>Contents</span>
-          <h3>目录</h3>
-        </div>
         <nav class="toc-list" data-toc='{{.Post.TOCJSON}}'></nav>
         <div class="toc-preview" data-toc-preview>
           <strong>当前章节</strong>

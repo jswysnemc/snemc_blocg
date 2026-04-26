@@ -341,7 +341,6 @@ textarea {
   position: relative;
   overflow: hidden;
   background: linear-gradient(135deg, var(--surface) 0%, var(--primary-subtle) 100%);
-  border-left: 3px solid var(--primary);
 }
 
 .featured-panel::before {
@@ -363,12 +362,6 @@ textarea {
 
 .sidebar-card {
   padding: 20px;
-  border-left: 3px solid transparent;
-  transition: border-color 200ms ease;
-}
-
-.sidebar-card:hover {
-  border-left-color: var(--primary);
 }
 
 .section-heading {
@@ -1738,6 +1731,105 @@ textarea {
 
   .sidebar-content .sidebar-card:last-child {
     margin-bottom: 0;
+  }
+
+  /* 文章目录悬浮按钮 */
+  .article-sidebar {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 40;
+    max-width: 320px;
+    max-height: 70vh;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: 0;
+    display: none;
+  }
+
+  .article-sidebar.is-open {
+    display: block;
+    animation: sidebar-slide-down 200ms ease;
+  }
+
+  .toc-fab {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 50;
+    width: 48px;
+    height: 48px;
+    border-radius: 999px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(22, 93, 255, 0.35);
+    transition: transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  .toc-fab:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(22, 93, 255, 0.45);
+  }
+
+  .toc-fab:active {
+    transform: scale(0.95);
+  }
+
+  .toc-fab svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .toc-fab.is-active {
+    display: none;
+  }
+
+  .toc-close {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface-subtle);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  .toc-close span {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .toc-close-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text-soft);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 180ms ease, border-color 180ms ease;
+  }
+
+  .toc-close-btn:hover {
+    background: var(--surface-subtle);
+    border-color: var(--line-strong);
+  }
+
+  .toc-close-btn svg {
+    width: 16px;
+    height: 16px;
   }
 }
 
