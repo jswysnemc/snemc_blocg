@@ -233,6 +233,7 @@ func migrate(db *sql.DB) error {
 				entry_path TEXT NOT NULL DEFAULT '',
 				storage_mode TEXT NOT NULL DEFAULT 'empty',
 				download_name TEXT NOT NULL DEFAULT '',
+				page_title TEXT NOT NULL DEFAULT '',
 				file_count INTEGER NOT NULL DEFAULT 0,
 				total_size INTEGER NOT NULL DEFAULT 0,
 				created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -284,6 +285,7 @@ func migrate(db *sql.DB) error {
 		`ALTER TABLE app_settings ADD COLUMN about_star_count TEXT NOT NULL DEFAULT '';`,
 		`ALTER TABLE app_settings ADD COLUMN about_fork_count TEXT NOT NULL DEFAULT '';`,
 		`ALTER TABLE app_settings ADD COLUMN about_friend_links TEXT NOT NULL DEFAULT '';`,
+		`ALTER TABLE static_sites ADD COLUMN page_title TEXT NOT NULL DEFAULT '';`,
 	}
 	for _, stmt := range optionalStatements {
 		if _, err := db.Exec(stmt); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {

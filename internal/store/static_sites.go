@@ -16,6 +16,7 @@ type StaticSiteUploadState struct {
 	EntryPath    string
 	StorageMode  string
 	DownloadName string
+	PageTitle    string
 	FileCount    int
 	TotalSize    int64
 }
@@ -33,7 +34,7 @@ func normalizeStaticSiteStorageMode(value string) string {
 
 func (s *Store) ListStaticSites(ctx context.Context) ([]StaticSite, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT id, route_id, entry_path, storage_mode, download_name, file_count, total_size, created_at, updated_at
+SELECT id, route_id, entry_path, storage_mode, download_name, page_title, file_count, total_size, created_at, updated_at
 FROM static_sites
 ORDER BY datetime(updated_at) DESC, id DESC
 `)
@@ -55,7 +56,7 @@ ORDER BY datetime(updated_at) DESC, id DESC
 
 func (s *Store) ListPublicStaticSites(ctx context.Context, limit int) ([]StaticSite, error) {
 	query := `
-SELECT id, route_id, entry_path, storage_mode, download_name, file_count, total_size, created_at, updated_at
+SELECT id, route_id, entry_path, storage_mode, download_name, page_title, file_count, total_size, created_at, updated_at
 FROM static_sites
 WHERE entry_path <> '' AND file_count > 0 AND storage_mode <> ?
 ORDER BY datetime(updated_at) DESC, id DESC
@@ -94,8 +95,8 @@ func (s *Store) CreateStaticSite(ctx context.Context) (StaticSite, error) {
 		return StaticSite{}, err
 	}
 	res, err := tx.ExecContext(ctx, `
-INSERT INTO static_sites (route_id, entry_path, storage_mode, download_name, file_count, total_size, updated_at)
-VALUES (?, '', ?, '', 0, 0, CURRENT_TIMESTAMP)
+INSERT INTO static_sites (route_id, entry_path, storage_mode, download_name, page_title, file_count, total_size, updated_at)
+VALUES (?, '', ?, '', '', 0, 0, CURRENT_TIMESTAMP)
 `, routeID, StaticSiteStorageEmpty)
 	if err != nil {
 		return StaticSite{}, err
@@ -112,7 +113,7 @@ VALUES (?, '', ?, '', 0, 0, CURRENT_TIMESTAMP)
 
 func (s *Store) GetStaticSiteByID(ctx context.Context, id int64) (StaticSite, error) {
 	row := s.db.QueryRowContext(ctx, `
-SELECT id, route_id, entry_path, storage_mode, download_name, file_count, total_size, created_at, updated_at
+SELECT id, route_id, entry_path, storage_mode, download_name, page_title, file_count, total_size, created_at, updated_at
 FROM static_sites
 WHERE id = ?
 `, id)
@@ -125,7 +126,7 @@ WHERE id = ?
 
 func (s *Store) GetStaticSiteByRouteID(ctx context.Context, routeID string) (StaticSite, error) {
 	row := s.db.QueryRowContext(ctx, `
-SELECT id, route_id, entry_path, storage_mode, download_name, file_count, total_size, created_at, updated_at
+SELECT id, route_id, entry_path, storage_mode, download_name, page_title, file_count, total_size, created_at, updated_at
 FROM static_sites
 WHERE route_id = ?
 `, strings.TrimSpace(routeID))
@@ -139,6 +140,7 @@ WHERE route_id = ?
 func (s *Store) UpdateStaticSiteUpload(ctx context.Context, id int64, input StaticSiteUploadState) (StaticSite, error) {
 	input.EntryPath = strings.TrimSpace(input.EntryPath)
 	input.DownloadName = strings.TrimSpace(input.DownloadName)
+	input.PageTitle = strings.TrimSpace(input.PageTitle)
 	input.StorageMode = normalizeStaticSiteStorageMode(input.StorageMode)
 	if input.EntryPath == "" || input.DownloadName == "" || input.StorageMode == StaticSiteStorageEmpty || input.FileCount <= 0 || input.TotalSize <= 0 {
 		return StaticSite{}, ErrInvalidInput
@@ -146,9 +148,29 @@ func (s *Store) UpdateStaticSiteUpload(ctx context.Context, id int64, input Stat
 
 	result, err := s.db.ExecContext(ctx, `
 UPDATE static_sites
-SET entry_path = ?, storage_mode = ?, download_name = ?, file_count = ?, total_size = ?, updated_at = CURRENT_TIMESTAMP
+SET entry_path = ?, storage_mode = ?, download_name = ?, page_title = ?, file_count = ?, total_size = ?, updated_at = CURRENT_TIMESTAMP
 WHERE id = ?
-`, input.EntryPath, input.StorageMode, input.DownloadName, input.FileCount, input.TotalSize, id)
+`, input.EntryPath, input.StorageMode, input.DownloadName, input.PageTitle, input.FileCount, input.TotalSize, id)
+	if err != nil {
+		return StaticSite{}, err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return StaticSite{}, err
+	}
+	if rowsAffected == 0 {
+		return StaticSite{}, ErrNotFound
+	}
+	return s.GetStaticSiteByID(ctx, id)
+}
+
+func (s *Store) UpdateStaticSitePageTitle(ctx context.Context, id int64, title string) (StaticSite, error) {
+	title = strings.TrimSpace(title)
+	result, err := s.db.ExecContext(ctx, `
+UPDATE static_sites
+SET page_title = ?
+WHERE id = ?
+`, title, id)
 	if err != nil {
 		return StaticSite{}, err
 	}
@@ -220,6 +242,7 @@ func scanStaticSite(scanner staticSiteScanner) (StaticSite, error) {
 		&item.EntryPath,
 		&item.StorageMode,
 		&item.DownloadName,
+		&item.PageTitle,
 		&item.FileCount,
 		&item.TotalSize,
 		&createdAt,

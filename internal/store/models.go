@@ -183,6 +183,7 @@ type StaticSite struct {
 	EntryPath    string    `json:"entry_path"`
 	StorageMode  string    `json:"storage_mode"`
 	DownloadName string    `json:"download_name"`
+	PageTitle    string    `json:"page_title"`
 	FileCount    int       `json:"file_count"`
 	TotalSize    int64     `json:"total_size"`
 	CreatedAt    time.Time `json:"created_at"`

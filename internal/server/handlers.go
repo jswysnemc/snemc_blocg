@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -38,6 +39,7 @@ func (a *App) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	hostedSites = a.cacheStaticSitePageTitles(r.Context(), hostedSites)
 
 	page := HomePage{
 		PageMeta:        a.pageMeta(r, a.cfg.SiteName+" | Editorial Engineering Blog", "Go + Vue3 + SQLite 技术博客，强调预编译渲染、紧凑界面和高性能阅读体验。"),
@@ -106,6 +108,7 @@ func (a *App) handleHostedPages(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	sites = a.cacheStaticSitePageTitles(r.Context(), sites)
 	page := HostedPagesPage{
 		PageMeta: a.pageMeta(r, "托管网页 | "+a.cfg.SiteName, "浏览站点托管的独立 HTML 页面和静态目录。"),
 		Sites:    hostedSiteLinks(sites),
@@ -228,14 +231,7 @@ func (a *App) handlePostPage(w http.ResponseWriter, r *http.Request) {
 func hostedSiteLinks(sites []store.StaticSite) []HostedSiteLink {
 	links := make([]HostedSiteLink, 0, len(sites))
 	for _, site := range sites {
-		title := strings.TrimSpace(site.DownloadName)
-		if ext := strings.ToLower(path.Ext(title)); ext == ".zip" || ext == ".html" || ext == ".htm" {
-			title = strings.TrimSuffix(title, path.Ext(title))
-		}
-		title = strings.TrimSpace(title)
-		if title == "" || title == "." {
-			title = "/h/" + site.RouteID + "/"
-		}
+		title := staticSiteDisplayTitle(site)
 		modeLabel := "目录"
 		if site.StorageMode == store.StaticSiteStorageSingleFile {
 			modeLabel = "单页"
@@ -255,6 +251,49 @@ func hostedSiteLinks(sites []store.StaticSite) []HostedSiteLink {
 		})
 	}
 	return links
+}
+
+func (a *App) cacheStaticSitePageTitles(ctx context.Context, sites []store.StaticSite) []store.StaticSite {
+	for i := range sites {
+		site := sites[i]
+		if strings.TrimSpace(site.PageTitle) != "" || !isHTMLFilePath(site.EntryPath) {
+			continue
+		}
+		fullPath, err := resolveStaticSiteFSPath(a.staticSiteDir(site.RouteID), site.EntryPath)
+		if err != nil {
+			continue
+		}
+		data, err := os.ReadFile(fullPath)
+		if err != nil {
+			continue
+		}
+		title := normalizeStaticSitePageTitle(data)
+		if title == "" {
+			continue
+		}
+		updated, err := a.store.UpdateStaticSitePageTitle(ctx, site.ID, title)
+		if err == nil {
+			sites[i] = updated
+			continue
+		}
+		sites[i].PageTitle = title
+	}
+	return sites
+}
+
+func staticSiteDisplayTitle(site store.StaticSite) string {
+	if title := strings.TrimSpace(site.PageTitle); title != "" {
+		return title
+	}
+	title := strings.TrimSpace(site.DownloadName)
+	if ext := strings.ToLower(path.Ext(title)); ext == ".zip" || ext == ".html" || ext == ".htm" {
+		title = strings.TrimSuffix(title, path.Ext(title))
+	}
+	title = strings.TrimSpace(title)
+	if title == "" || title == "." {
+		title = "/h/" + site.RouteID + "/"
+	}
+	return title
 }
 
 func (a *App) handleRobots(w http.ResponseWriter, r *http.Request) {

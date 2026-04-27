@@ -4,12 +4,14 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
+	"html"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,6 +24,12 @@ import (
 const (
 	staticSiteMaxUploadBytes = 128 << 20
 	staticSiteMaxUploadFiles = 512
+	staticSiteMaxTitleLength = 160
+)
+
+var (
+	staticSiteTitlePattern = regexp.MustCompile(`(?is)<title\b[^>]*>(.*?)</title>`)
+	staticSiteHTMLPattern  = regexp.MustCompile(`(?is)<[^>]+>`)
 )
 
 type staticSiteUploadFile struct {
@@ -94,10 +102,12 @@ func (a *App) handleAdminUploadStaticSite(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	pageTitle := extractStaticSitePageTitle(bundle.Files, bundle.EntryPath)
 	site, err = a.store.UpdateStaticSiteUpload(r.Context(), site.ID, store.StaticSiteUploadState{
 		EntryPath:    bundle.EntryPath,
 		StorageMode:  bundle.StorageMode,
 		DownloadName: bundle.DownloadName,
+		PageTitle:    pageTitle,
 		FileCount:    bundle.FileCount,
 		TotalSize:    bundle.TotalSize,
 	})
@@ -410,6 +420,32 @@ func setRewrittenStaticSiteContentType(w http.ResponseWriter, relativePath strin
 	case ".js", ".mjs":
 		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	}
+}
+
+func extractStaticSitePageTitle(files []staticSiteUploadFile, entryPath string) string {
+	if !isHTMLFilePath(entryPath) {
+		return ""
+	}
+	for _, item := range files {
+		if item.RelativePath == entryPath {
+			return normalizeStaticSitePageTitle(item.Data)
+		}
+	}
+	return ""
+}
+
+func normalizeStaticSitePageTitle(data []byte) string {
+	matches := staticSiteTitlePattern.FindSubmatch(data)
+	if len(matches) < 2 {
+		return ""
+	}
+	title := staticSiteHTMLPattern.ReplaceAllString(string(matches[1]), " ")
+	title = html.UnescapeString(title)
+	title = strings.Join(strings.Fields(title), " ")
+	if len([]rune(title)) > staticSiteMaxTitleLength {
+		title = string([]rune(title)[:staticSiteMaxTitleLength])
+	}
+	return title
 }
 
 func collectStaticSiteUpload(headers []*multipart.FileHeader, paths []string, requestedEntry string, requestedName string) (staticSiteUploadBundle, error) {

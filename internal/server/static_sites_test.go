@@ -3,6 +3,8 @@ package server
 import (
 	"strings"
 	"testing"
+
+	"github.com/snemc/snemc-blog/internal/store"
 )
 
 func TestRewriteStaticSiteTextRewritesUploadedRootPaths(t *testing.T) {
@@ -42,5 +44,34 @@ func TestRewriteStaticSiteTextOnlyRewritesUploadedPaths(t *testing.T) {
 	}
 	if !strings.Contains(output, `fetch("/h/8n658jndpq/tutor1.zh_cn")`) {
 		t.Fatalf("expected uploaded file path rewrite, got: %s", output)
+	}
+}
+
+func TestExtractStaticSitePageTitle(t *testing.T) {
+	title := extractStaticSitePageTitle([]staticSiteUploadFile{
+		{
+			RelativePath: "index.html",
+			Data: []byte(`<!doctype html>
+<html>
+<head><title>  Benchmark &amp; Tutor  </title></head>
+<body></body>
+</html>`),
+		},
+	}, "index.html")
+
+	if title != "Benchmark & Tutor" {
+		t.Fatalf("expected parsed title, got %q", title)
+	}
+}
+
+func TestStaticSiteDisplayTitlePrefersCachedPageTitle(t *testing.T) {
+	title := staticSiteDisplayTitle(store.StaticSite{
+		RouteID:      "8n658jndpq",
+		DownloadName: "dist",
+		PageTitle:    "解析后的页面标题",
+	})
+
+	if title != "解析后的页面标题" {
+		t.Fatalf("expected cached page title, got %q", title)
 	}
 }

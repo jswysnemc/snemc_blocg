@@ -122,6 +122,7 @@ export interface StaticSite {
   entry_path: string;
   storage_mode: string;
   download_name: string;
+  page_title: string;
   file_count: number;
   total_size: number;
   created_at: string;
