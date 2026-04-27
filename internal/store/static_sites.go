@@ -53,6 +53,35 @@ ORDER BY datetime(updated_at) DESC, id DESC
 	return sites, rows.Err()
 }
 
+func (s *Store) ListPublicStaticSites(ctx context.Context, limit int) ([]StaticSite, error) {
+	query := `
+SELECT id, route_id, entry_path, storage_mode, download_name, file_count, total_size, created_at, updated_at
+FROM static_sites
+WHERE entry_path <> '' AND file_count > 0 AND storage_mode <> ?
+ORDER BY datetime(updated_at) DESC, id DESC
+`
+	args := []any{StaticSiteStorageEmpty}
+	if limit > 0 {
+		query += `LIMIT ?`
+		args = append(args, limit)
+	}
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	sites := make([]StaticSite, 0)
+	for rows.Next() {
+		item, err := scanStaticSite(rows)
+		if err != nil {
+			return nil, err
+		}
+		sites = append(sites, item)
+	}
+	return sites, rows.Err()
+}
+
 func (s *Store) CreateStaticSite(ctx context.Context) (StaticSite, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

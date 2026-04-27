@@ -1,0 +1,42 @@
+{{define "hosted_pages"}}
+<!doctype html>
+<html lang="zh-CN">
+{{template "head" .}}
+<body>
+  <div class="page-gradient"></div>
+  {{template "site-header" .}}
+  <main class="shell list-shell">
+    <section class="page-hero compact-hero">
+      <div class="hero-kicker">Hosted Pages</div>
+      <h1>托管网页</h1>
+      <p>这里汇总站点通过 `/h` 路由托管的独立 HTML 页面和静态目录，适合展示工具页、演示页或临时专题内容。</p>
+    </section>
+
+    <section class="content-panel hosted-page-panel">
+      <div class="section-heading">
+        <span>Public Index</span>
+        <h2>可访问页面</h2>
+      </div>
+      <div class="hosted-page-grid">
+        {{range .Sites}}
+        <a class="hosted-page-card" href="{{.URL}}" target="_blank" rel="noreferrer">
+          <span class="pill">{{.ModeLabel}}</span>
+          <strong>{{.Title}}</strong>
+          <small>{{.URL}}</small>
+          <div class="hosted-page-meta">
+            <span>入口 {{.EntryPath}}</span>
+            <span>{{.Meta}}</span>
+            {{if .UpdatedLabel}}<span>更新 {{.UpdatedLabel}}</span>{{end}}
+          </div>
+        </a>
+        {{else}}
+        <p class="empty-text">当前还没有可公开访问的托管网页。</p>
+        {{end}}
+      </div>
+    </section>
+  </main>
+  {{template "site-footer" .}}
+  {{template "scripts" .}}
+</body>
+</html>
+{{end}}

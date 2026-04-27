@@ -75,6 +75,7 @@ type HomePage struct {
 	Categories      []store.Category
 	Tags            []store.Tag
 	Recommendations []store.Recommendation
+	HostedSites     []HostedSiteLink
 }
 
 type ListPage struct {
@@ -84,6 +85,21 @@ type ListPage struct {
 	Posts      []store.PostSummary
 	Categories []store.Category
 	Tags       []store.Tag
+}
+
+type HostedSiteLink struct {
+	Title        string
+	URL          string
+	RouteID      string
+	EntryPath    string
+	ModeLabel    string
+	Meta         string
+	UpdatedLabel string
+}
+
+type HostedPagesPage struct {
+	PageMeta
+	Sites []HostedSiteLink
 }
 
 type ArchivePage struct {
@@ -246,6 +262,7 @@ func (a *App) routes() http.Handler {
 	r.Get("/", a.handleHome)
 	r.Get("/about", a.handleAboutPage)
 	r.Get("/archive", a.handleArchivePage)
+	r.Get("/pages", a.handleHostedPages)
 	r.Get("/search", a.handleSearchPage)
 	r.Get("/category/{slug}", a.handleCategoryPage)
 	r.Get("/tag/{slug}", a.handleTagPage)

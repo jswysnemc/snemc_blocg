@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -32,6 +33,11 @@ func (a *App) handleHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	recommendations, _ := a.store.GetRecommendations(r.Context(), visitorID, 0, a.cfg.RecommendationN)
+	hostedSites, err := a.store.ListPublicStaticSites(r.Context(), 4)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	page := HomePage{
 		PageMeta:        a.pageMeta(r, a.cfg.SiteName+" | Editorial Engineering Blog", "Go + Vue3 + SQLite 技术博客，强调预编译渲染、紧凑界面和高性能阅读体验。"),
@@ -39,6 +45,7 @@ func (a *App) handleHome(w http.ResponseWriter, r *http.Request) {
 		Categories:      bundle.Categories,
 		Tags:            bundle.Tags,
 		Recommendations: recommendations,
+		HostedSites:     hostedSiteLinks(hostedSites),
 	}
 	if len(posts) > 0 {
 		page.Featured = &posts[0]
@@ -91,6 +98,20 @@ func (a *App) handleArchivePage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "public, max-age=60")
 	a.renderTemplate(w, "archive", page)
+}
+
+func (a *App) handleHostedPages(w http.ResponseWriter, r *http.Request) {
+	sites, err := a.store.ListPublicStaticSites(r.Context(), 0)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	page := HostedPagesPage{
+		PageMeta: a.pageMeta(r, "托管网页 | "+a.cfg.SiteName, "浏览站点托管的独立 HTML 页面和静态目录。"),
+		Sites:    hostedSiteLinks(sites),
+	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	a.renderTemplate(w, "hosted_pages", page)
 }
 
 func (a *App) handleCategoryPage(w http.ResponseWriter, r *http.Request) {
@@ -204,6 +225,38 @@ func (a *App) handlePostPage(w http.ResponseWriter, r *http.Request) {
 	a.renderTemplate(w, "post", page)
 }
 
+func hostedSiteLinks(sites []store.StaticSite) []HostedSiteLink {
+	links := make([]HostedSiteLink, 0, len(sites))
+	for _, site := range sites {
+		title := strings.TrimSpace(site.DownloadName)
+		if ext := strings.ToLower(path.Ext(title)); ext == ".zip" || ext == ".html" || ext == ".htm" {
+			title = strings.TrimSuffix(title, path.Ext(title))
+		}
+		title = strings.TrimSpace(title)
+		if title == "" || title == "." {
+			title = "/h/" + site.RouteID + "/"
+		}
+		modeLabel := "目录"
+		if site.StorageMode == store.StaticSiteStorageSingleFile {
+			modeLabel = "单页"
+		}
+		updatedLabel := ""
+		if !site.UpdatedAt.IsZero() {
+			updatedLabel = site.UpdatedAt.Format("2006-01-02")
+		}
+		links = append(links, HostedSiteLink{
+			Title:        title,
+			URL:          "/h/" + site.RouteID + "/",
+			RouteID:      site.RouteID,
+			EntryPath:    site.EntryPath,
+			ModeLabel:    modeLabel,
+			Meta:         fmt.Sprintf("%s · %d 个文件", modeLabel, site.FileCount),
+			UpdatedLabel: updatedLabel,
+		})
+	}
+	return links
+}
+
 func (a *App) handleRobots(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	fmt.Fprintf(w, "User-agent: *\nAllow: /\nSitemap: %s/sitemap.xml\n", strings.TrimRight(a.cfg.SiteURL, "/"))
@@ -215,13 +268,22 @@ func (a *App) handleSitemap(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	hostedSites, err := a.store.ListPublicStaticSites(r.Context(), 0)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	var buf bytes.Buffer
 	buf.WriteString(`<?xml version="1.0" encoding="UTF-8"?>`)
 	buf.WriteString(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`)
 	buf.WriteString(fmt.Sprintf(`<url><loc>%s/</loc></url>`, strings.TrimRight(a.cfg.SiteURL, "/")))
 	buf.WriteString(fmt.Sprintf(`<url><loc>%s/about</loc></url>`, strings.TrimRight(a.cfg.SiteURL, "/")))
+	buf.WriteString(fmt.Sprintf(`<url><loc>%s/pages</loc></url>`, strings.TrimRight(a.cfg.SiteURL, "/")))
 	for _, post := range posts {
 		buf.WriteString(fmt.Sprintf(`<url><loc>%s/posts/%s</loc></url>`, strings.TrimRight(a.cfg.SiteURL, "/"), template.HTMLEscapeString(post.Slug)))
+	}
+	for _, site := range hostedSites {
+		buf.WriteString(fmt.Sprintf(`<url><loc>%s/h/%s/</loc></url>`, strings.TrimRight(a.cfg.SiteURL, "/"), template.HTMLEscapeString(site.RouteID)))
 	}
 	buf.WriteString(`</urlset>`)
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
