@@ -2,6 +2,7 @@ package server
 
 import (
 	"archive/zip"
+	"bytes"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -206,7 +207,7 @@ func (a *App) handleStaticSite(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if site.EntryPath == "index.html" || site.EntryPath == "index.htm" {
-			a.serveStaticSiteFile(w, r, siteDir, site.EntryPath)
+			a.serveStaticSiteFile(w, r, siteDir, site.RouteID, site.EntryPath)
 			return
 		}
 		http.Redirect(w, r, site.EntryPath, http.StatusFound)
@@ -223,7 +224,7 @@ func (a *App) handleStaticSite(w http.ResponseWriter, r *http.Request) {
 		for _, indexName := range []string{"index.html", "index.htm"} {
 			candidate := path.Join(relativePath, indexName)
 			if a.staticSiteFileExists(siteDir, candidate) {
-				a.serveStaticSiteFile(w, r, siteDir, candidate)
+				a.serveStaticSiteFile(w, r, siteDir, site.RouteID, candidate)
 				return
 			}
 		}
@@ -231,7 +232,7 @@ func (a *App) handleStaticSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if a.staticSiteFileExists(siteDir, relativePath) {
-		a.serveStaticSiteFile(w, r, siteDir, relativePath)
+		a.serveStaticSiteFile(w, r, siteDir, site.RouteID, relativePath)
 		return
 	}
 	for _, indexName := range []string{"index.html", "index.htm"} {
@@ -302,7 +303,7 @@ func (a *App) staticSiteFileExists(siteDir string, relativePath string) bool {
 	return err == nil && !info.IsDir()
 }
 
-func (a *App) serveStaticSiteFile(w http.ResponseWriter, r *http.Request, siteDir string, relativePath string) {
+func (a *App) serveStaticSiteFile(w http.ResponseWriter, r *http.Request, siteDir string, routeID string, relativePath string) {
 	fullPath, err := resolveStaticSiteFSPath(siteDir, relativePath)
 	if err != nil {
 		http.NotFound(w, r)
@@ -315,7 +316,37 @@ func (a *App) serveStaticSiteFile(w http.ResponseWriter, r *http.Request, siteDi
 	}
 
 	setStaticSiteResponseHeaders(w, relativePath)
+	if isHTMLFilePath(relativePath) {
+		data, err := os.ReadFile(fullPath)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		rewritten := rewriteStaticSiteHTML(data, routeID)
+		http.ServeContent(w, r, info.Name(), info.ModTime(), bytes.NewReader(rewritten))
+		return
+	}
 	http.ServeFile(w, r, fullPath)
+}
+
+func rewriteStaticSiteHTML(input []byte, routeID string) []byte {
+	prefix := []byte("/h/" + routeID + "/")
+	output := input
+	for _, item := range []struct {
+		old []byte
+		new []byte
+	}{
+		{[]byte(`href="/assets/`), append([]byte(`href="`), append(prefix, []byte(`assets/`)...)...)},
+		{[]byte(`src="/assets/`), append([]byte(`src="`), append(prefix, []byte(`assets/`)...)...)},
+		{[]byte(`href='/assets/`), append([]byte(`href='`), append(prefix, []byte(`assets/`)...)...)},
+		{[]byte(`src='/assets/`), append([]byte(`src='`), append(prefix, []byte(`assets/`)...)...)},
+		{[]byte(`url(/assets/`), append([]byte(`url(`), append(prefix, []byte(`assets/`)...)...)},
+		{[]byte(`url("/assets/`), append([]byte(`url("`), append(prefix, []byte(`assets/`)...)...)},
+		{[]byte(`url('/assets/`), append([]byte(`url('`), append(prefix, []byte(`assets/`)...)...)},
+	} {
+		output = bytes.ReplaceAll(output, item.old, item.new)
+	}
+	return output
 }
 
 func collectStaticSiteUpload(headers []*multipart.FileHeader, paths []string, requestedEntry string, requestedName string) (staticSiteUploadBundle, error) {
@@ -514,7 +545,7 @@ func setStaticSiteResponseHeaders(w http.ResponseWriter, relativePath string) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	if isHTMLFilePath(relativePath) {
 		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("Content-Security-Policy", "sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-top-navigation-by-user-activation")
+		w.Header().Set("Content-Security-Policy", "sandbox allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-top-navigation-by-user-activation")
 		w.Header().Set("Permissions-Policy", "camera=(), geolocation=(), microphone=(), payment=(), usb=()")
 		return
 	}
