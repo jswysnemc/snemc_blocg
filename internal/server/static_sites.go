@@ -316,37 +316,100 @@ func (a *App) serveStaticSiteFile(w http.ResponseWriter, r *http.Request, siteDi
 	}
 
 	setStaticSiteResponseHeaders(w, relativePath)
-	if isHTMLFilePath(relativePath) {
+	if shouldRewriteStaticSiteText(relativePath) {
 		data, err := os.ReadFile(fullPath)
 		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
-		rewritten := rewriteStaticSiteHTML(data, routeID)
+		filePaths, err := listStaticSiteRelativeFiles(siteDir)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		rewritten := rewriteStaticSiteText(data, routeID, filePaths)
+		setRewrittenStaticSiteContentType(w, relativePath)
 		http.ServeContent(w, r, info.Name(), info.ModTime(), bytes.NewReader(rewritten))
 		return
 	}
 	http.ServeFile(w, r, fullPath)
 }
 
-func rewriteStaticSiteHTML(input []byte, routeID string) []byte {
+func listStaticSiteRelativeFiles(siteDir string) ([]string, error) {
+	files := make([]string, 0)
+	err := filepath.WalkDir(siteDir, func(fullPath string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		relativePath, err := filepath.Rel(siteDir, fullPath)
+		if err != nil {
+			return err
+		}
+		files = append(files, filepath.ToSlash(relativePath))
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(files, func(i, j int) bool {
+		return len(files[i]) > len(files[j])
+	})
+	return files, nil
+}
+
+func rewriteStaticSiteText(input []byte, routeID string, filePaths []string) []byte {
 	prefix := []byte("/h/" + routeID + "/")
 	output := input
-	for _, item := range []struct {
-		old []byte
-		new []byte
-	}{
-		{[]byte(`href="/assets/`), append([]byte(`href="`), append(prefix, []byte(`assets/`)...)...)},
-		{[]byte(`src="/assets/`), append([]byte(`src="`), append(prefix, []byte(`assets/`)...)...)},
-		{[]byte(`href='/assets/`), append([]byte(`href='`), append(prefix, []byte(`assets/`)...)...)},
-		{[]byte(`src='/assets/`), append([]byte(`src='`), append(prefix, []byte(`assets/`)...)...)},
-		{[]byte(`url(/assets/`), append([]byte(`url(`), append(prefix, []byte(`assets/`)...)...)},
-		{[]byte(`url("/assets/`), append([]byte(`url("`), append(prefix, []byte(`assets/`)...)...)},
-		{[]byte(`url('/assets/`), append([]byte(`url('`), append(prefix, []byte(`assets/`)...)...)},
-	} {
-		output = bytes.ReplaceAll(output, item.old, item.new)
+	for _, filePath := range filePaths {
+		if strings.TrimSpace(filePath) == "" {
+			continue
+		}
+		absolutePath := []byte("/" + filePath)
+		prefixedPath := append(prefix, []byte(filePath)...)
+		for _, item := range []struct {
+			old []byte
+			new []byte
+		}{
+			{append([]byte(`"`), absolutePath...), append([]byte(`"`), prefixedPath...)},
+			{append([]byte(`'`), absolutePath...), append([]byte(`'`), prefixedPath...)},
+			{append([]byte("`"), absolutePath...), append([]byte("`"), prefixedPath...)},
+			{append([]byte(`url(`), absolutePath...), append([]byte(`url(`), prefixedPath...)},
+			{append([]byte(`url("`), absolutePath...), append([]byte(`url("`), prefixedPath...)},
+			{append([]byte(`url('`), absolutePath...), append([]byte(`url('`), prefixedPath...)},
+		} {
+			output = bytes.ReplaceAll(output, item.old, item.new)
+		}
 	}
 	return output
+}
+
+func shouldRewriteStaticSiteText(relativePath string) bool {
+	if isHTMLFilePath(relativePath) {
+		return true
+	}
+	switch strings.ToLower(path.Ext(relativePath)) {
+	case ".css", ".js", ".mjs":
+		return true
+	default:
+		return false
+	}
+}
+
+func setRewrittenStaticSiteContentType(w http.ResponseWriter, relativePath string) {
+	if w.Header().Get("Content-Type") != "" {
+		return
+	}
+	switch strings.ToLower(path.Ext(relativePath)) {
+	case ".html", ".htm":
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	case ".css":
+		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	case ".js", ".mjs":
+		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	}
 }
 
 func collectStaticSiteUpload(headers []*multipart.FileHeader, paths []string, requestedEntry string, requestedName string) (staticSiteUploadBundle, error) {
@@ -545,7 +608,6 @@ func setStaticSiteResponseHeaders(w http.ResponseWriter, relativePath string) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	if isHTMLFilePath(relativePath) {
 		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("Content-Security-Policy", "sandbox allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-top-navigation-by-user-activation")
 		w.Header().Set("Permissions-Policy", "camera=(), geolocation=(), microphone=(), payment=(), usb=()")
 		return
 	}
